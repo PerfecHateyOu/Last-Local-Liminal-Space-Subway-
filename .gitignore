@@ -14,3 +14,6 @@ playwright-report/
 # AI Studio's working notes (implementation plans etc.)
 .aistudio/
 dist-offline/
+
+# Dev-only .glb exports (bun run export:glb)
+exports/

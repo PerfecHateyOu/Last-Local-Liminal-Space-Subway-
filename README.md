@@ -125,6 +125,38 @@ The music steps back for the doors at each stop, nearly vanishes under PA announ
 | Close a dialog or confirmation | Esc | Close / Cancel button |
 | Debug overlay (spoilers; development builds only) | Backquote, in `bun run dev` | None (compiled out of the released game) |
 
+## Export models to Blender (dev only)
+
+All geometry is built in code (`src/graphics/*Builder.ts`, `passingTrain.ts`); there are no model files. To get it into Blender:
+
+```bash
+cd e2e && bun install && bunx playwright install chromium && cd ..   # once
+bun run export:glb
+```
+
+This writes one `.glb` per part to `exports/` (gitignored), plus `exports/previews/<name>.png` for each file and `exports/LAST_LOCAL-contact-sheet.png`:
+
+| Files | What |
+| --- | --- |
+| `subway_car` | cars A/B/C, gangways and tunnel together, in game coordinates |
+| `car_A_interior`, `car_C_interior` | the lead and rear cars on their own, centred |
+| `gangway_bellows_A_B`, `gangway_bellows_B_C` | the two bellows between cars |
+| `tunnel` | walls, piers, lamps and signals laid out at rest |
+| `station_01_Hoyt_Schermerhorn` … `station_13_Court_Sq` | one per stop (same platform, own sign); `station_12_21_St_open_air` is the elevated variant |
+| `station_platform`, `station_platform_open_air` | the two platform variants in game coordinates |
+| `trestle_steel`, `trestle_rain`, `trestle_scenery` | Newtown Creek trestle: bents and rails, rain strips, sky/skyline/water/beacons |
+| `character_*` | one per passenger and parent |
+| `passing_train`, `trial_room` | the other-track train and the Trial room |
+
+Canvas textures (signs, ads, tiles, cloth grain) are embedded as PNGs. Each file is reloaded with GLTFLoader as a check. With `bun run dev` running you can also open <http://localhost:3000/dev/export.html> and click to download them. To render previews and a contact sheet for `.glb` files you edited elsewhere: `bun run export:glb -- --previews path/to/dir`.
+
+The exporter lives in `src/dev/glbExport.ts` and is only reached from `dev/export.html`, which the production and offline builds never include.
+
+**Importing:** in Blender, *File > Import > glTF 2.0 (.glb/.gltf)*. Defaults are fine. Nodes and materials keep their names (for example `carB_mid_Box_12`, `Lambert_c8c2b4_tex`). Units are metres with Y up, which the importer converts to Blender's Z-up. Notes:
+- Lambert materials come in as Principled BSDF (roughness 1); basic (unlit) materials use `KHR_materials_unlit` and come in as emission-only.
+- The trestle sky is a custom shader in the game. It exports as a flat placeholder colour, so repaint it in Blender.
+- Ceiling point lights come in as lights. In the game they are hidden and a small pool of real lights follows the camera, so expect a brighter car in Blender.
+
 ## Project layout
 
 | Path | Contents |

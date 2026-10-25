@@ -12,7 +12,8 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "cd e2e && bun run test",
-    "test:ui": "cd e2e && bun run test:ui"
+    "test:ui": "cd e2e && bun run test:ui",
+    "export:glb": "node scripts/export-glb.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

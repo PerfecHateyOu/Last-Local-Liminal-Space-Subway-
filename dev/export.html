@@ -1,0 +1,25 @@
+<!doctype html>
+<!-- Dev-only (Vite dev server): http://localhost:3000/dev/export.html. Not part of `vite build`. -->
+<html>
+  <head><meta charset="utf-8" /><title>Last Local – GLB export (dev)</title></head>
+  <body style="font: 14px monospace; background: #111; color: #ddd; padding: 16px">
+    <h3>Last Local: export procedural geometry to .glb</h3>
+    <button id="go">Export and download all</button>
+    <pre id="log"></pre>
+    <script type="module">
+      import { exportAll, exportAllBase64, verifyBase64, previewBase64, contactSheet } from '/src/dev/glbExport.ts';
+      window.__exportGLB = exportAllBase64; window.__verifyGLB = verifyBase64; window.__previewGLB = previewBase64; window.__contactSheet = contactSheet; // used by scripts/export-glb.mjs
+      window.__exportReady = true;
+      const log = (s) => (document.getElementById('log').textContent += s + '\n');
+      document.getElementById('go').onclick = async () => {
+        for (const f of await exportAll()) {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([f.bytes], { type: 'model/gltf-binary' }));
+          a.download = f.name;
+          a.click();
+          log(`${f.name}  ${(f.bytes.byteLength / 1024).toFixed(1)} KB ${f.notes.join('; ')}`);
+        }
+      };
+    </script>
+  </body>
+</html>

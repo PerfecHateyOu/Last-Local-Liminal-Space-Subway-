@@ -7,8 +7,8 @@
     <button id="go">Export and download all</button>
     <pre id="log"></pre>
     <script type="module">
-      import { exportAll, exportAllBase64, verifyBase64 } from '/src/dev/glbExport.ts';
-      window.__exportGLB = exportAllBase64; window.__verifyGLB = verifyBase64; // used by scripts/export-glb.mjs
+      import { exportAll, exportAllBase64, verifyBase64, previewBase64, contactSheet } from '/src/dev/glbExport.ts';
+      window.__exportGLB = exportAllBase64; window.__verifyGLB = verifyBase64; window.__previewGLB = previewBase64; window.__contactSheet = contactSheet; // used by scripts/export-glb.mjs
       window.__exportReady = true;
       const log = (s) => (document.getElementById('log').textContent += s + '\n');
       document.getElementById('go').onclick = async () => {

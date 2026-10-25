@@ -41,7 +41,7 @@ GitHub Actions runs the type-check, the build, and the full browser suite on eve
 
 ### Google AI Studio and bun.lock
 
-Google AI Studio puts back its original starter `bun.lock` every time it syncs to GitHub. So the root `package.json` keeps the starter's packages (`@google/genai`, `express`, `dotenv`, `motion`, `@types/express`, `autoprefixer`, `esbuild`, `tsx`) even though the game doesn't import them; they never reach the built game. Don't remove them, or the next sync breaks CI again. If a sync ever brings a different lock, CI's "Check bun.lock matches package.json" step fails and says what changed.
+Google AI Studio puts back its original starter `bun.lock` every time it syncs to GitHub. So the root `package.json` keeps the starter's packages (`@google/genai`, `express`, `dotenv`, `motion`, `@types/express`, `autoprefixer`, `esbuild`, `tsx`) even though the game doesn't import them; they never reach the built game. Don't remove them, or the next sync breaks CI again. If a sync ever brings a different lock, CI's "Check bun.lock matches package.json" step fails and says what changed. When a push to `main` leaves either lockfile missing or out of step with its `package.json`, the Lockfile repair workflow (`.github/workflows/lockfile-repair.yml`) puts it back from the commit before and opens a PR with the fix; merge that PR. To run the same repair locally: `scripts/repair-lockfiles.sh <last good commit>`.
 
 ## Deploy to Cloud Run
 

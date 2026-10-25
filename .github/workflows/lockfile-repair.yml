@@ -1,0 +1,79 @@
+name: Lockfile repair
+
+# AI Studio pushes straight to main, and its syncs have replaced bun.lock with its starter lock
+# or deleted e2e/bun.lock (93ccde8, 766fab7). CI flags that, but only once it's on main. This puts
+# the lockfiles back and opens a PR with the fix, so nobody has to do it by hand.
+on:
+  push:
+    branches: [main]
+    paths: [bun.lock, package.json, e2e/bun.lock, e2e/package.json]
+  workflow_dispatch:
+
+concurrency:
+  group: lockfile-repair
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04 # see ci.yml
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - name: Put the lockfiles back
+        id: repair
+        run: |
+          # The commit before this push is the last state of main; a manual run uses HEAD~1.
+          good='${{ github.event.before }}'
+          if [ -z "$good" ] || ! git cat-file -e "$good^{commit}" 2>/dev/null; then good=HEAD~1; fi
+          changed=$(scripts/repair-lockfiles.sh "$good")
+          if [ -z "$changed" ]; then
+            echo "Both lockfiles match their package.json; nothing to repair."
+            exit 0
+          fi
+          echo "Repaired: $changed"
+          { echo 'changed<<EOF'; echo "$changed"; echo EOF; } >> "$GITHUB_OUTPUT"
+          echo "good=$(git rev-parse --short "$good")" >> "$GITHUB_OUTPUT"
+      # A PR opened with this workflow's token doesn't start CI, so check the fix builds here.
+      - name: Check the repaired tree builds
+        if: steps.repair.outputs.changed
+        run: |
+          bun run lint
+          bun run build
+      - name: Open a PR with the fix
+        if: steps.repair.outputs.changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGED: ${{ steps.repair.outputs.changed }}
+          GOOD: ${{ steps.repair.outputs.good }}
+        run: |
+          branch=ci/lockfile-repair
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898+github-actions[bot]@users.noreply.github.com'
+          git checkout -B "$branch"
+          git add bun.lock e2e/bun.lock
+          git commit -m "Restore the lockfiles after ${GITHUB_SHA::7}" \
+            -m "$(printf 'Repaired by the Lockfile repair workflow from %s:\n%s' "$GOOD" "$CHANGED")"
+          git push --force origin "$branch"
+          body="$(printf '%s\n' \
+            "Commit ${GITHUB_SHA::7} left the lockfiles out of step with package.json (CI's lockfile checks fail on main)." \
+            "" \
+            "Repaired from $GOOD, then reconciled with \`bun install\`:" \
+            "$(echo "$CHANGED" | sed 's/^/- /')" \
+            "" \
+            "Type-check and production build passed on this branch. CI doesn't start on PRs opened by a workflow, so the browser tests run once this is merged." \
+            "" \
+            "Opened by .github/workflows/lockfile-repair.yml.")"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number -q '.[].number')" ]; then
+            echo "A repair PR is already open; its branch now has this fix."
+          elif ! gh pr create --base main --head "$branch" --title "Restore the lockfiles after ${GITHUB_SHA::7}" --body "$body"; then
+            url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$branch?expand=1"
+            echo "::error title=Couldn't open the repair PR::The fix is on $branch. Open the PR at $url (or allow GitHub Actions to create pull requests in Settings, Actions, General)."
+            echo "The lockfile fix is on \`$branch\`, but the PR couldn't be opened: [open it here]($url)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

@@ -10,7 +10,7 @@
  * Audio lives in audio/evpAudio.ts; the engine wires suspicion, hands-busy and the handoff.
  */
 
-import { practice } from './practice';
+import { offRecord } from './practice';
 import { routeManager } from './routeManager';
 import { fillRoute } from './routeText';
 import { unlockAchievement } from './achievements';
@@ -181,7 +181,7 @@ export function loadEvpArchive(): EvpArchive {
 }
 
 function saveEvpArchive(a: EvpArchive) {
-  if (practice.on) return; // practice tapes play on this report only
+  if (offRecord()) return; // practice tapes play on this report only
   try {
     localStorage.setItem(ARCHIVE_KEY, JSON.stringify(a));
   } catch {

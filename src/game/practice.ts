@@ -12,7 +12,14 @@ export const practice = {
   on: false,
   /** The chapter the practice run started from (2 or 3). */
   chapter: 1,
+  /** The spoiler overlay was shown at some point this ride: treated like practice for saving. */
+  debugRun: false,
 };
+
+/** Nothing this ride does is saved: a practice run, or a debug run (the spoiler overlay was shown). */
+export function offRecord(): boolean {
+  return practice.on || practice.debugRun;
+}
 
 /** Where each chapter's ride starts: the segment index into SEGS (see constants.ts). */
 export const CHAPTER_START_SEGMENT: Record<number, number> = {

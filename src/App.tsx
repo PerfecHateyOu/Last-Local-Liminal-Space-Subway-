@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { GameEngine } from './game/gameState';
 import { audioEngine } from './audio/audioEngine';
 import { settings } from './settings';
+import { practice } from './game/practice';
 import { KeyLook, limitYaw } from './input/keyLook';
 import { evp } from './game/evpManager';
 import { passengerBehavior } from './game/passengerBehavior';
@@ -601,10 +602,11 @@ export default function App() {
         return;
       }
 
-      // The spoiler overlay is a development tool: backquote toggles it in `vite dev` only, and
-      // production builds compile it out entirely (HUD.tsx).
-      if (import.meta.env.DEV && e.code === 'Backquote') {
+      // The spoiler overlay: backquote toggles it in `vite dev`, or in any build once the player
+      // turns on Settings > Data > "Debug overlay (spoilers)". Showing it makes this a debug run.
+      if ((import.meta.env.DEV || settings.get().debugOverlay) && e.code === 'Backquote') {
         G.debug = !G.debug;
+        if (G.debug && G.phase !== 'menu') practice.debugRun = true;
         triggerUpdate();
         return;
       }
@@ -810,7 +812,7 @@ export default function App() {
 
     const G = engineRef.current;
     if (G) {
-      G.debug = false; // the backquote key turns it on (development builds)
+      G.debug = false; // the backquote key turns it on (dev builds, or the Debug overlay setting)
       G.nightmare = nightmare; // kept for Ride Again / Restart until the next start screen
       G.startChapter = startChapter; // likewise; Chapter II and III are practice runs
       // The first ride starts with the practice stretch (skippable); after that, straight in.

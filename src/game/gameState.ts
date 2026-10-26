@@ -56,7 +56,7 @@ import { routeManager } from './routeManager';
 import { routeText, fillRoute } from './routeText';
 import { resolveEnding, endingSummary, recordEndingToArchive, EndingDefinition, ExitChoice } from './endings';
 import { unlockAchievement } from './achievements';
-import { practice, CHAPTER_START_SEGMENT } from './practice';
+import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
 
 /** Foggy sodium-vapor night fog colour on the open trestle. */
@@ -264,6 +264,11 @@ export class GameEngine {
   /** This ride is a practice run (started from Chapter II or III): nothing it does is saved. */
   public get isPractice(): boolean {
     return practice.on;
+  }
+
+  /** The spoiler overlay was shown this ride, so nothing from it is saved (see practice.ts). */
+  public get isDebugRun(): boolean {
+    return practice.debugRun;
   }
 
   /** This ride began with "Get back on" after The Eternal Commute. */
@@ -697,6 +702,7 @@ export class GameEngine {
     // Practice run: start at the chapter's first stretch, from the station before it.
     const from = CHAPTER_START_SEGMENT[this.startChapter] ?? 0;
     practice.on = from > 0;
+    practice.debugRun = this.debug;
     practice.chapter = practice.on ? this.startChapter : 1;
     if (from > 0) {
       this.carBuilder.stA.setName(routeManager.getStopName(SEGS[from - 1].stop));
@@ -1810,7 +1816,7 @@ export class GameEngine {
 
     // A practice run isn't added to the ride history (or anything else; see practice.ts).
     const runs = this.loadRuns();
-    if (!practice.on) runs.push({
+    if (!offRecord()) runs.push({
       date: Date.now(),
       san: this.san,
       sanPct: this.getSanityScore(),
@@ -1820,7 +1826,7 @@ export class GameEngine {
       endingId: this.resolvedEnding.id,
       nightmare: this.nightmare,
     });
-    if (!practice.on) this.saveRuns(runs);
+    if (!offRecord()) this.saveRuns(runs);
     this.psychLog = recordRide(this.stopLog);
     polaroidManager.develop(); // prints develop now, after scoring
 

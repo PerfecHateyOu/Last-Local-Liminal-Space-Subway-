@@ -18,10 +18,10 @@ import { MoveStick } from './MoveStick';
 import { routeManager } from '../game/routeManager';
 import { polaroidManager } from '../game/polaroidManager';
 import { evp } from '../game/evpManager';
+import { useSettings } from '../settings';
 import { EvpRecorder } from './EvpRecorder';
 import { AnalogRollsign } from './AnalogRollsign';
 import { hintStrip } from '../ui/controls';
-import { useSettings } from '../settings';
 
 /** Seconds the key hints stay up on rides after your first. */
 const HINT_SECONDS = 60;
@@ -75,7 +75,7 @@ export const HUD: React.FC<HUDProps> = ({
   }, [hudShown]);
   // Key hints: on for the whole of your first ride (nothing finished on this device yet), and for
   // the first minute of later rides; then they fade. Settings can turn them off.
-  const { showHints } = useSettings();
+  const { showHints, debugOverlay } = useSettings();
   const rideStartGT = React.useRef(0);
   const firstRide = React.useMemo(() => {
     rideStartGT.current = engine.GT;
@@ -117,6 +117,7 @@ export const HUD: React.FC<HUDProps> = ({
   // Choice options
   const choice = G.choice;
   const showChoices = !!choice;
+
 
   const b = G.getBand(G.bandStop);
 
@@ -483,9 +484,9 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      {/* Spoilers Debug Overlay (development builds only; compiled out of production) */}
-      {import.meta.env.DEV && G.debug && (
-        <div className="absolute left-4 top-16 p-3 rounded bg-black/85 border border-g-line/40 text-g-line font-mono text-2xs leading-relaxed max-w-sm pointer-events-auto z-30">
+      {/* Spoilers Debug Overlay (dev builds, or Settings > "Debug overlay (spoilers)") */}
+      {(import.meta.env.DEV || debugOverlay) && G.debug && (
+        <div data-testid="debug-overlay" className="absolute left-4 top-16 p-3 rounded bg-black/85 border border-g-line/40 text-g-line font-mono text-2xs leading-relaxed max-w-sm pointer-events-auto z-30">
           <div className="font-bold border-b border-white/10 pb-1 mb-1 text-white">
             DEBUG: Stop {G.seg ? `${G.seg.stop}${G.seg.b ? 'b' : ''}` : '1'} ({G.phase}) | TS: {G.ts.toFixed(1)}s
           </div>

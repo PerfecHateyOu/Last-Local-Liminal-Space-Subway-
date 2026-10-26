@@ -4,7 +4,7 @@
  * articulated heads for gaze tracking, and specific anomaly state controls.
  */
 import * as THREE from 'three';
-import { takeParentModel } from './modelLoader';
+import { takeParentModel, takePassengerModel, PARENT_MODELS } from './modelLoader';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PersonArchetype, PersonObject } from '../types';
 import { TextureGenerator } from './textureGenerator';
@@ -241,7 +241,8 @@ export class CharacterBuilder {
 
     // Mom and Dad from Blender (.glb), when that's turned on and loaded (modelLoader.ts): the
     // model replaces the procedural body inside the same root, so position, seat and tid stay.
-    const model = takeParentModel(cfg.tid);
+    // Other passengers likewise, from a shared file per outfit and pose (each gets its own copy).
+    const model = cfg.tid in PARENT_MODELS ? takeParentModel(cfg.tid) : takePassengerModel(cfg.archetype, cfg.standing);
     let parts = { head: head as THREE.Group, phone, eyes, skMat: skMat as THREE.Material, skin: cfg.skin };
     if (model) {
       g.clear();

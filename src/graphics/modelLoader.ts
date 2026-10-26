@@ -9,6 +9,13 @@
  * and logs a warning. Production and offline builds ship no model files.
  *
  * Turn it on with `?models=parents` in the URL, or localStorage `gtrain-glb-parents` = "1".
+ *
+ * Ordinary passengers (everyone but Mom and Dad) have their own flag: `?models=passengers`
+ * (or `?models=parents,passengers`, or `?models=all`), or localStorage `gtrain-glb-passengers` = "1".
+ * Their files are shared by outfit and pose, `passenger-<archetype>[-standing].glb` (the archetype
+ * is `plain` for people with no outfit), so one file can stand in for several people: each gets
+ * its own clone (SkeletonUtils.clone) with its own copy of every material, so a recolour on one
+ * never shows on another. A missing or bad file leaves just those people procedural.
  * Node contract (see docs/blender-models.md):
  *   Head    a node with its origin at the neck (the pivot the head turns on), made YXZ here
  *   Eye_*   one or more meshes (the pupils: the frozen-face anomaly scales them)
@@ -24,6 +31,22 @@ export const PARENT_MODELS: Record<string, { file: string }> = {
   dad: { file: 'dad.glb' },
 };
 export const MODELS_FLAG_KEY = 'gtrain-glb-parents';
+export const PASSENGER_FLAG_KEY = 'gtrain-glb-passengers';
+
+/** Outfit-and-pose keys of the ordinary passengers the cars build (subwayCarBuilder.ts). */
+export const PASSENGER_MODELS = [
+  'mta', 'coat', 'puffer-standing', 'plain', 'hoodie', 'hoodie-standing', 'texter', 'texter-standing',
+  'overcoat', 'office', 'office-standing',
+] as const;
+export function passengerModelKey(archetype: string | undefined, standing: boolean | undefined): string {
+  return `${archetype || 'plain'}${standing ? '-standing' : ''}`;
+}
+/** Per-key result for passengers ('passenger-office-standing' and so on). */
+export const passengerStatus: Record<string, ModelStatus> = Object.fromEntries(
+  PASSENGER_MODELS.map((k) => [`passenger-${k}`, 'off' as ModelStatus])
+);
+const passengerScenes = new Map<string, THREE.Object3D>();
+let cloneScene: ((o: THREE.Object3D) => THREE.Object3D) | null = null;
 const LOAD_TIMEOUT_MS = 5000;
 
 export interface AdaptedModel {
@@ -39,14 +62,23 @@ export type ModelStatus = 'off' | 'loaded' | 'fallback';
 export const modelStatus: Record<string, ModelStatus> = { mom: 'off', dad: 'off' };
 const ready = new Map<string, AdaptedModel>();
 
-export function parentModelsEnabled(): boolean {
+function modelsFlag(group: 'parents' | 'passengers', key: string): boolean {
   if (import.meta.env.MODE === 'offline') return false; // file:// can't fetch; the offline build stays procedural
   try {
-    if (new URLSearchParams(location.search).get('models') === 'parents') return true;
-    return localStorage.getItem(MODELS_FLAG_KEY) === '1';
+    const q = (new URLSearchParams(location.search).get('models') || '').split(',').map((x) => x.trim());
+    if (q.includes(group) || q.includes('all')) return true;
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
+}
+
+export function parentModelsEnabled(): boolean {
+  return modelsFlag('parents', MODELS_FLAG_KEY);
+}
+
+export function passengerModelsEnabled(): boolean {
+  return modelsFlag('passengers', PASSENGER_FLAG_KEY);
 }
 
 /**
@@ -95,37 +127,92 @@ function isUnder(o: THREE.Object3D, parent: THREE.Object3D): boolean {
   return false;
 }
 
-/** Fetch and adapt the parents' models. Resolves when done (or timed out); never rejects. */
+/** Fetch and adapt the optional models (parents and/or passengers). Resolves when done; never rejects. */
 export async function preloadParentModels(base = import.meta.env.BASE_URL): Promise<void> {
-  if (!parentModelsEnabled()) return;
+  const parents = parentModelsEnabled();
+  const passengers = passengerModelsEnabled();
+  if (!parents && !passengers) return;
   let GLTFLoader: typeof import('three/examples/jsm/loaders/GLTFLoader.js').GLTFLoader;
   try {
     // A constant condition, so the offline build (which never loads models) drops the loader entirely.
     const mod = import.meta.env.MODE === 'offline' ? null : await import('three/examples/jsm/loaders/GLTFLoader.js');
     if (!mod) return;
     GLTFLoader = mod.GLTFLoader;
+    if (passengers) {
+      const su = import.meta.env.MODE === 'offline' ? null : await import('three/examples/jsm/utils/SkeletonUtils.js');
+      if (su) cloneScene = su.clone;
+    }
   } catch (e) {
-    console.warn('[models] GLTFLoader failed to load; using procedural parents', e);
-    for (const tid of Object.keys(PARENT_MODELS)) modelStatus[tid] = 'fallback';
+    console.warn('[models] GLTFLoader failed to load; using procedural figures', e);
+    if (parents) for (const tid of Object.keys(PARENT_MODELS)) modelStatus[tid] = 'fallback';
+    if (passengers) for (const k of Object.keys(passengerStatus)) passengerStatus[k] = 'fallback';
     return;
   }
   const loader = new GLTFLoader();
-  await Promise.all(
-    Object.entries(PARENT_MODELS).map(async ([tid, { file }]) => {
-      const url = `${base}models/characters/${file}`;
-      try {
-        const gltf = await Promise.race([
-          loader.loadAsync(url),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timed out')), LOAD_TIMEOUT_MS)),
-        ]);
-        ready.set(tid, adaptModel(gltf.scene, file));
-        modelStatus[tid] = 'loaded';
-      } catch (e) {
-        modelStatus[tid] = 'fallback';
-        console.warn(`[models] ${url}: ${(e as Error).message || e}; using the procedural figure`);
-      }
-    })
-  );
+  const load = (url: string) =>
+    Promise.race([
+      loader.loadAsync(url),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timed out')), LOAD_TIMEOUT_MS)),
+    ]);
+  const jobs: Promise<void>[] = [];
+  if (parents)
+    for (const [tid, { file }] of Object.entries(PARENT_MODELS))
+      jobs.push(
+        (async () => {
+          const url = `${base}models/characters/${file}`;
+          try {
+            ready.set(tid, adaptModel((await load(url)).scene, file));
+            modelStatus[tid] = 'loaded';
+          } catch (e) {
+            modelStatus[tid] = 'fallback';
+            console.warn(`[models] ${url}: ${(e as Error).message || e}; using the procedural figure`);
+          }
+        })()
+      );
+  if (passengers)
+    for (const k of PASSENGER_MODELS)
+      jobs.push(
+        (async () => {
+          const file = `passenger-${k}.glb`;
+          const url = `${base}models/characters/${file}`;
+          try {
+            const scene = (await load(url)).scene;
+            adaptModel(scene, file); // check the contract once, on the shared original
+            passengerScenes.set(k, scene);
+            passengerStatus[`passenger-${k}`] = 'loaded';
+          } catch (e) {
+            passengerStatus[`passenger-${k}`] = 'fallback';
+            console.warn(`[models] ${url}: ${(e as Error).message || e}; using the procedural figures`);
+          }
+        })()
+      );
+  await Promise.all(jobs);
+}
+
+/**
+ * A passenger's own copy of the shared model for this outfit and pose, or null (flag off, file
+ * missing or bad). Geometry is shared; every material is this passenger's own.
+ */
+export function takePassengerModel(archetype: string | undefined, standing: boolean | undefined): AdaptedModel | null {
+  const src = passengerScenes.get(passengerModelKey(archetype, standing));
+  if (!src || !cloneScene) return null;
+  try {
+    const copy = cloneScene(src);
+    const own = new Map<THREE.Material, THREE.Material>();
+    const mine = (m: THREE.Material) => {
+      let c = own.get(m);
+      if (!c) own.set(m, (c = m.clone()));
+      return c;
+    };
+    copy.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) m.material = Array.isArray(m.material) ? m.material.map(mine) : mine(m.material);
+    });
+    return adaptModel(copy);
+  } catch (e) {
+    console.warn('[models] passenger clone failed; using the procedural figure', e);
+    return null;
+  }
 }
 
 /** The adapted model for this tid, once (each is used by one figure). */

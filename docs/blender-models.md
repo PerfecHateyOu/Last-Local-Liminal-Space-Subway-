@@ -1,4 +1,4 @@
-# Blender models for Mom and Dad (optional, off by default)
+# Blender models for Mom, Dad and passengers (optional, off by default)
 
 The game's people are procedural (design doc v5.3 §2.2, "no asset files"). This relaxes that rule
 **only behind a flag** and only for Mom and Dad: with the flag on, the game loads
@@ -32,3 +32,37 @@ feet. The game places it in the parent's seat. The adapter rejects anything with
 
 Materials are kept as imported (no PS1 or nearest-neighbour conversion). Keep each file small
 (the exported parents are about 125–145 KB). No animation or skinning is used.
+
+## Passengers (optional, separate flag)
+Ordinary passengers (everyone except Mom and Dad) can use Blender models too, behind their own flag.
+Turning on one flag doesn't turn on the other.
+
+1. Put any of the files below in `public/models/characters/`.
+2. Open the game with `?models=passengers` (both: `?models=parents,passengers` or `?models=all`),
+   or run `localStorage.setItem('gtrain-glb-passengers', '1')` and reload.
+
+Files are shared by **outfit and pose**, so one file covers everyone who wears that outfit in that
+pose. Each person gets their own copy with their own materials, so recolouring one never changes another.
+
+| File | Who uses it today |
+|---|---|
+| `passenger-mta.glb` | s1, the man across the aisle |
+| `passenger-coat.glb` | s2, the woman on your bench |
+| `passenger-puffer-standing.glb` | s3, the standing passenger |
+| `passenger-plain.glb` | seat6 (the far seat) and c5 (no outfit) |
+| `passenger-hoodie-standing.glb` | c1 |
+| `passenger-hoodie.glb` | pc2 (Car C) |
+| `passenger-texter.glb` | c2 |
+| `passenger-texter-standing.glb` | pc1 (Car C) |
+| `passenger-overcoat.glb` | c3, pa2 (Car A) |
+| `passenger-office-standing.glb` | c4 |
+| `passenger-office.glb` | pa1 (Car A) |
+
+The node contract is the same as for the parents (`Head`, `Eye_*` inside `Head`, one `Skin*`
+material, optional `Phone`, +Z forward, metres, feet at y = 0). Seated files are modelled seated.
+`-standing` files are modelled standing, with the feet on the floor. If a file is missing or broken,
+the people who use it stay procedural and the console logs a `[models]` warning.
+
+Known limits: a model replaces the whole procedural body, so the small prop habits the procedural
+figures have (newspaper page turns, phone thumb-flicks) are not added to models. Head habits and
+gaze still work. Skinned meshes are cloned with SkeletonUtils, but no animation is played.

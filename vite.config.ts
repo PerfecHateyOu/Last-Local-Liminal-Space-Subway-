@@ -35,7 +35,9 @@ export default defineConfig(({ mode }) => {
               // browsers keep them cached across game updates.
               codeSplitting: {
                 groups: [
-                  { name: 'three', test: /node_modules[\\/]three[\\/]/ },
+                  // three's add-ons (examples/jsm) stay with whoever imports them, so a dynamic import
+                  // (GLTFLoader in modelLoader.ts) stays its own chunk.
+                  { name: 'three', test: /node_modules[\\/]three[\\/](?!examples[\\/])/ },
                   { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
                 ],
               },

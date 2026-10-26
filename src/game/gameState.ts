@@ -56,6 +56,7 @@ import { routeManager } from './routeManager';
 import { routeText, fillRoute } from './routeText';
 import { resolveEnding, endingSummary, recordEndingToArchive, EndingDefinition, ExitChoice } from './endings';
 import { unlockAchievement } from './achievements';
+import { setMaterialColor } from '../graphics/modelLoader';
 import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
 
@@ -651,7 +652,7 @@ export class GameEngine {
       p.pitch = 0.5;
       p.facing = false;
       p.eyes.forEach((e) => e.scale.set(1, 1, 1));
-      (p.skMat as THREE.MeshLambertMaterial).color.set(p.skin);
+      setMaterialColor(p.skMat, p.skin);
     });
 
     [...cb.strangers, cb.extraPerson, ...cb.crowd].forEach((s) => {
@@ -1472,7 +1473,7 @@ export class GameEngine {
       const mom = this.carBuilder.parents[0];
       mom.frozen = true;
       mom.eyes.forEach((e) => e.scale.set(2.2, 2.2, 1.8));
-      (mom.skMat as THREE.MeshLambertMaterial).color.set(0xdfd9ce);
+      setMaterialColor(mom.skMat, 0xdfd9ce);
       if (mom.phone) mom.phone.visible = false;
     });
     beat(4.0, () => this.setSub('<b>Dad:</b> No. We\u2019re not getting off. You know that.', 3.2));
@@ -1525,7 +1526,7 @@ export class GameEngine {
       const mom = this.carBuilder.parents[0];
       mom.frozen = false;
       mom.eyes.forEach((e) => e.scale.set(1, 1, 1));
-      (mom.skMat as THREE.MeshLambertMaterial).color.set(mom.skin);
+      setMaterialColor(mom.skMat, mom.skin);
     }
     if (!liveId('empty')) {
       this.carBuilder.strangers.forEach((s) => (s.g.visible = true));

@@ -4,6 +4,7 @@
  * articulated heads for gaze tracking, and specific anomaly state controls.
  */
 import * as THREE from 'three';
+import { takeParentModel } from './modelLoader';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PersonArchetype, PersonObject } from '../types';
 import { TextureGenerator } from './textureGenerator';
@@ -59,6 +60,7 @@ export class CharacterBuilder {
     // Materials. Skin stays its own material per person (an anomaly recolours Mom's); every
     // garment is woven cloth (fabric), shared with anyone wearing the same thing.
     const skMat = new THREE.MeshLambertMaterial({ color: cfg.skin });
+    skMat.name = 'Skin'; // the .glb node contract (modelLoader.ts): exports carry it
     const clothMat = this.fabric(cfg.shirt);
     const pantsMat = this.fabric(cfg.pants);
     const hairMat = new THREE.MeshLambertMaterial({ color: cfg.hair });
@@ -138,6 +140,7 @@ export class CharacterBuilder {
     // Articulated Head
     const head = new THREE.Group();
     head.rotation.order = 'YXZ';
+    head.name = 'Head';
     head.position.set(0, 1.22 + up, 0);
     g.add(head);
 
@@ -187,6 +190,7 @@ export class CharacterBuilder {
       head.add(eyeWhite);
 
       const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0115, 8, 6), eyePupilMat);
+      pupil.name = ex < 0 ? 'Eye_R' : 'Eye_L';
       pupil.position.set(ex, 0.016, 0.1);
       head.add(pupil);
       eyes.push(pupil);
@@ -220,6 +224,7 @@ export class CharacterBuilder {
       // as a tell if the phone is plain to see; turned toward her face it was a dark slab you missed.
       phoneGroup.rotation.x = -0.92;
       g.add(phoneGroup);
+      phoneGroup.name = 'Phone';
       phone = phoneGroup;
     }
 
@@ -234,13 +239,25 @@ export class CharacterBuilder {
     g.position.set(cfg.x, 0, cfg.z);
     g.rotation.y = cfg.ry || 0;
 
+    // Mom and Dad from Blender (.glb), when that's turned on and loaded (modelLoader.ts): the
+    // model replaces the procedural body inside the same root, so position, seat and tid stay.
+    const model = takeParentModel(cfg.tid);
+    let parts = { head: head as THREE.Group, phone, eyes, skMat: skMat as THREE.Material, skin: cfg.skin };
+    if (model) {
+      g.clear();
+      g.add(model.root);
+      parts = {
+        head: model.head as THREE.Group,
+        phone: model.phone,
+        eyes: model.eyes,
+        skMat: model.skMat,
+        skin: (model.skMat as THREE.MeshLambertMaterial).color.getHex(),
+      };
+    }
+
     const person: PersonObject = {
       g,
-      head,
-      phone,
-      eyes,
-      skMat,
-      skin: cfg.skin,
+      ...parts,
       tid: cfg.tid,
       label: cfg.label,
       home: new THREE.Vector3(cfg.x, 0, cfg.z),
@@ -249,7 +266,7 @@ export class CharacterBuilder {
       standing: !!cfg.standing,
     };
 
-    head.rotation.set(person.pose[1], person.pose[0], 0);
+    person.head.rotation.set(person.pose[1], person.pose[0], 0);
     return person;
   }
 

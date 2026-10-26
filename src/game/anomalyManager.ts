@@ -4,6 +4,7 @@
  * unobserved manifestation angle checks, and lifecycle reversion.
  */
 import * as THREE from 'three';
+import { setMaterialColor } from '../graphics/modelLoader';
 import { SWAP_CHAR_MAP } from '../constants';
 import { SubwayCarBuilder, AdObject } from '../graphics/subwayCarBuilder';
 import { ActiveAnomaly, AnomalyDef } from '../types';
@@ -255,13 +256,13 @@ export class AnomalyManager {
             apply: () => {
               mom.frozen = true;
               mom.eyes.forEach((e) => e.scale.set(2.2, 2.2, 1.8));
-              (mom.skMat as THREE.MeshLambertMaterial).color.set(0xdfd9ce);
+              setMaterialColor(mom.skMat, 0xdfd9ce);
               if (mom.phone) mom.phone.visible = false;
             },
             revert: () => {
               mom.frozen = false;
               mom.eyes.forEach((e) => e.scale.set(1, 1, 1));
-              (mom.skMat as THREE.MeshLambertMaterial).color.set(mom.skin);
+              setMaterialColor(mom.skMat, mom.skin);
             },
           };
         },

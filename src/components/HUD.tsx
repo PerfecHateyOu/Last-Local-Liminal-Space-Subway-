@@ -486,7 +486,7 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* Spoilers Debug Overlay (dev builds, or Settings > "Debug overlay (spoilers)") */}
       {(import.meta.env.DEV || debugOverlay) && G.debug && (
-        <div data-testid="debug-overlay" className="absolute left-4 top-16 p-3 rounded bg-black/85 border border-g-line/40 text-g-line font-mono text-2xs leading-relaxed max-w-sm pointer-events-auto z-30">
+        <div data-testid="debug-overlay" className="absolute left-2 top-14 sm:left-4 sm:top-16 p-2 sm:p-3 rounded bg-black/75 border border-g-line/40 text-g-line font-mono text-3xs sm:text-2xs leading-snug sm:leading-relaxed max-w-[60vw] sm:max-w-sm pointer-events-none select-none z-30">
           <div className="font-bold border-b border-white/10 pb-1 mb-1 text-white">
             DEBUG: Stop {G.seg ? `${G.seg.stop}${G.seg.b ? 'b' : ''}` : '1'} ({G.phase}) | TS: {G.ts.toFixed(1)}s
           </div>

@@ -703,7 +703,7 @@ export class GameEngine {
     // Practice run: start at the chapter's first stretch, from the station before it.
     const from = CHAPTER_START_SEGMENT[this.startChapter] ?? 0;
     practice.on = from > 0;
-    practice.debugRun = this.debug;
+    practice.debugRun = this.debug || settings.get().debugOverlay;
     practice.chapter = practice.on ? this.startChapter : 1;
     if (from > 0) {
       this.carBuilder.stA.setName(routeManager.getStopName(SEGS[from - 1].stop));

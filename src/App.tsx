@@ -114,6 +114,22 @@ export default function App() {
   }, []);
 
 
+  // Turning "Debug overlay (spoilers)" on mid-ride (pause > Settings) shows it at once and makes
+  // the ride a debug run; turning it off hides it, but the ride stays a debug run.
+  useEffect(() => {
+    let was = settings.get().debugOverlay;
+    return settings.subscribe(() => {
+      const on = settings.get().debugOverlay;
+      if (on === was) return;
+      was = on;
+      const G = engineRef.current;
+      if (!G) return;
+      G.debug = on;
+      if (on && G.phase !== 'menu') practice.debugRun = true;
+      triggerUpdate();
+    });
+  }, []);
+
   useEffect(() => {
     if (phase !== 'menu' && !paused) setSettingsOpen(false);
     // The route selector opens mid-ride (L or the HUD), so it stays up while the train runs and
@@ -812,7 +828,10 @@ export default function App() {
 
     const G = engineRef.current;
     if (G) {
-      G.debug = false; // the backquote key turns it on (dev builds, or the Debug overlay setting)
+      // With Settings > "Debug overlay (spoilers)" on, the overlay shows from the start (phones have no
+      // backquote key) and the whole ride is a debug run. Backquote still hides/shows it on keyboards.
+      G.debug = settings.get().debugOverlay;
+      if (G.debug) practice.debugRun = true;
       G.nightmare = nightmare; // kept for Ride Again / Restart until the next start screen
       G.startChapter = startChapter; // likewise; Chapter II and III are practice runs
       // The first ride starts with the practice stretch (skippable); after that, straight in.

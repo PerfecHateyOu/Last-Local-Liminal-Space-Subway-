@@ -251,7 +251,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose, isTouch }
           <Section title="Spoilers">
             <Check
               label="Debug overlay (spoilers)"
-              hint="Spoiler warning: shows hidden anomalies, sanity and suspicion. Press ` during a ride to show it. Rides where it's shown are debug runs and save nothing."
+              hint="Spoiler warning: shows hidden anomalies, sanity and suspicion. It shows during rides while this is on (` hides or shows it on a keyboard). Rides where it's shown are debug runs and save nothing."
               checked={s.debugOverlay}
               onChange={(v) => settings.set({ debugOverlay: v })}
             />

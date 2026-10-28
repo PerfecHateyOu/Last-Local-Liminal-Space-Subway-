@@ -32,6 +32,10 @@ export interface Settings {
    * A ride where it was shown is a debug run and saves nothing.
    */
   debugOverlay: boolean;
+  /** Ask the browser for raw (unaccelerated) mouse movement while looking, where supported. */
+  rawMouse: boolean;
+  /** Walking speeds up and slows down gradually instead of starting and stopping at once. */
+  smoothWalking: boolean;
 }
 
 export const SENSITIVITY_RANGE = [0.4, 2.0] as const;
@@ -46,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   startMuted: false,
   showHints: true,
   debugOverlay: false,
+  rawMouse: true,
+  smoothWalking: false,
 };
 
 const KEY = 'gtrain-settings';
@@ -76,6 +82,8 @@ function sanitize(raw: any): Settings {
     startMuted: typeof raw.startMuted === 'boolean' ? raw.startMuted : d.startMuted,
     showHints: typeof raw.showHints === 'boolean' ? raw.showHints : d.showHints,
     debugOverlay: typeof raw.debugOverlay === 'boolean' ? raw.debugOverlay : d.debugOverlay,
+    rawMouse: typeof raw.rawMouse === 'boolean' ? raw.rawMouse : d.rawMouse,
+    smoothWalking: typeof raw.smoothWalking === 'boolean' ? raw.smoothWalking : d.smoothWalking,
   };
 }
 

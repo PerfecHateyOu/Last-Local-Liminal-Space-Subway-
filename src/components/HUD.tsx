@@ -19,6 +19,7 @@ import { routeManager } from '../game/routeManager';
 import { polaroidManager } from '../game/polaroidManager';
 import { evp } from '../game/evpManager';
 import { useSettings } from '../settings';
+import { pointerLock } from '../input/pointerLock';
 import { EvpRecorder } from './EvpRecorder';
 import { AnalogRollsign } from './AnalogRollsign';
 import { hintStrip } from '../ui/controls';
@@ -76,6 +77,8 @@ export const HUD: React.FC<HUDProps> = ({
   // Key hints: on for the whole of your first ride (nothing finished on this device yet), and for
   // the first minute of later rides; then they fade. Settings can turn them off.
   const { showHints, debugOverlay } = useSettings();
+  // A mouse lock request failed (often the browser's cooldown right after Esc): say how to look.
+  const lockHint = React.useSyncExternalStore(pointerLock.subscribeHint, () => pointerLock.hint);
   const rideStartGT = React.useRef(0);
   const firstRide = React.useMemo(() => {
     rideStartGT.current = engine.GT;
@@ -345,6 +348,16 @@ export const HUD: React.FC<HUDProps> = ({
           <div className="absolute inset-0 pointer-events-none transit-sign-raster opacity-30" />
           <span className="inline-block w-2 h-2 rounded-full bg-warn mr-2 animate-ping" />
           <span className="relative z-10">{G.paText}</span>
+        </div>
+      )}
+
+      {lockHint && !G.paused && !pointerLock.isLocked && (
+        <div
+          data-testid="lock-hint"
+          role="status"
+          className="absolute left-1/2 bottom-24 -translate-x-1/2 px-3 py-1 rounded bg-black/60 text-cream/80 text-xs pointer-events-none"
+        >
+          Click to look around
         </div>
       )}
 

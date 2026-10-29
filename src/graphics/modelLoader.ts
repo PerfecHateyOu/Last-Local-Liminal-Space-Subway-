@@ -32,7 +32,19 @@ export interface ModelManifest {
   models: Record<string, ModelManifestEntry>;
 }
 
-const DEFAULT_MANIFEST_URL = '/models/characters/manifest.json';
+/**
+ * Model URLs resolve against the page (Vite's BASE_URL), never the site root, so the game works
+ * from a subpath such as itch.io's `html/<id>/index.html`. A manifest basePath written as
+ * `/models/...` is treated the same as `models/...`.
+ */
+export function resolveModelPath(path: string): string {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) return path;
+  const base = (import.meta.env?.BASE_URL ?? '/').replace(/\/?$/, '/');
+  return base + path.replace(/^\.?\//, '');
+}
+
+const DEFAULT_BASE_PATH = 'models/characters/';
+const DEFAULT_MANIFEST_URL = DEFAULT_BASE_PATH + 'manifest.json';
 
 export class BlenderModelLoader {
   private loader = new GLTFLoader();
@@ -65,7 +77,7 @@ export class BlenderModelLoader {
 
     this.manifestPromise = (async () => {
       try {
-        const res = await fetch(url, { cache: 'no-cache' });
+        const res = await fetch(resolveModelPath(url), { cache: 'no-cache' });
         if (!res.ok) return null;
         const ct = res.headers.get('content-type') || '';
         if (ct.includes('text/html')) return null;
@@ -74,7 +86,7 @@ export class BlenderModelLoader {
         this.manifest = data;
         for (const [k, entry] of Object.entries(data.models)) {
           if (entry.role === 'anomaly') {
-            void this.loadModelEntry(k, entry, data.basePath || '/models/characters/');
+            void this.loadModelEntry(k, entry, data.basePath || DEFAULT_BASE_PATH);
           }
         }
         return data;
@@ -160,7 +172,7 @@ export class BlenderModelLoader {
     }
 
     const entry = manifest.models[key];
-    const template = await this.loadModelEntry(key, entry, manifest.basePath || '/models/characters/');
+    const template = await this.loadModelEntry(key, entry, manifest.basePath || DEFAULT_BASE_PATH);
     if (!template) {
       this.status.set(cfg.tid, 'fallback');
       return false;
@@ -179,7 +191,7 @@ export class BlenderModelLoader {
   public async loadModelEntry(
     key: string,
     entry: ModelManifestEntry,
-    basePath: string = '/models/characters/'
+    basePath: string = DEFAULT_BASE_PATH
   ): Promise<THREE.Group | null> {
     const cached = this.cache.get(key);
     if (cached) return cached;
@@ -188,7 +200,7 @@ export class BlenderModelLoader {
     if (existing) return existing;
 
     this.status.set(key, 'loading');
-    const url = `${basePath.replace(/\/?$/, '/')}${entry.file.replace(/^\//, '')}`;
+    const url = resolveModelPath(`${basePath.replace(/\/?$/, '/')}${entry.file.replace(/^\//, '')}`);
 
     const promise = (async () => {
       try {

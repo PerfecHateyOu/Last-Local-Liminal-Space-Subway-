@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "basePath": "/models/characters/",
+  "basePath": "models/characters/",
   "models": {
     "mom": {
       "file": "mom.glb",

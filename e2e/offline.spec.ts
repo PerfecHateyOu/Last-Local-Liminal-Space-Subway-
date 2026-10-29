@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { SKIP_TUTORIAL } from './game';
 
@@ -170,3 +170,37 @@ async function offline(page: import('@playwright/test').Page, context: import('@
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   return { requests, errors };
 }
+
+// itch.io serves the HTML5 zip from a subpath (html-classic.itch.zone/html/<id>/index.html), with
+// models/characters/ beside index.html. Model URLs must resolve against the page, not the site root.
+test('served over http from a subpath, the Blender models load from beside index.html', async ({ page }) => {
+  const r = root();
+  const index = join(r, 'dist-offline', 'Last-Local', 'index.html');
+  if (!existsSync(index)) execFileSync('node', [join(r, 'scripts', 'build-offline.mjs')], { cwd: r, stdio: 'inherit' });
+  const prefix = 'http://itch.test/html/123/';
+  const hits: Array<{ url: string; status: number }> = [];
+  const outside: string[] = [];
+  await page.route('**/*', (route) => {
+    const url = route.request().url().split('?')[0];
+    if (!url.startsWith('http://itch.test/')) return route.continue();
+    if (!url.startsWith(prefix)) { outside.push(url); return route.fulfill({ status: 404, body: '' }); }
+    const rel = url.slice(prefix.length) || 'index.html';
+    const path = rel === 'index.html' ? index : join(r, 'public', rel);
+    const ok = (rel === 'index.html' || rel.startsWith('models/')) && existsSync(path);
+    if (rel.startsWith('models/')) hits.push({ url: rel, status: ok ? 200 : 404 });
+    if (!ok) return route.fulfill({ status: 404, body: '' });
+    const type = rel.endsWith('.html') ? 'text/html' : rel.endsWith('.json') ? 'application/json' : 'model/gltf-binary';
+    return route.fulfill({ body: readFileSync(path), contentType: type });
+  });
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(SKIP_TUTORIAL);
+  await page.addInitScript(() => localStorage.setItem('gtrain-settings', JSON.stringify({ fullscreenOnBoard: false })));
+  await page.goto(prefix + 'index.html');
+  await page.locator('text=/Board the train/i').click();
+  await expect.poll(() => hits.filter((h) => h.url.endsWith('.glb') && h.status === 200).length, { timeout: 30_000 }).toBeGreaterThan(0);
+  expect(hits.find((h) => h.url === 'models/characters/manifest.json')?.status).toBe(200);
+  expect(hits.filter((h) => h.status !== 200)).toEqual([]);
+  expect(outside).toEqual([]);
+  expect(errors).toEqual([]);
+});

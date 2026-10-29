@@ -566,6 +566,8 @@ export class BlenderModelLoader {
 
     // 6. Reset carLife state and sync raycast target meshes
     person.life = undefined;
+    person.isImportedModel = true;
+    person.modelSource = entry.file;
     this.syncTargetMeshes(person);
   }
 
@@ -802,3 +804,9 @@ export class BlenderModelLoader {
 }
 
 export const modelLoader = new BlenderModelLoader();
+
+/** Set a material's colour if it has one (imported Skin may be Standard rather than Lambert). */
+export function setMaterialColor(mat: THREE.Material, hex: number) {
+  const c = (mat as THREE.MeshLambertMaterial).color;
+  if (c instanceof THREE.Color) c.setHex(hex);
+}

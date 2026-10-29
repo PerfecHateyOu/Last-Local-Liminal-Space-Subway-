@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { SWAP_CHAR_MAP } from '../constants';
 import { SubwayCarBuilder, AdObject } from '../graphics/subwayCarBuilder';
-import { modelLoader } from '../graphics/modelLoader';
+import { modelLoader, setMaterialColor } from '../graphics/modelLoader';
 import { ActiveAnomaly, AnomalyDef } from '../types';
 import { shuffle } from './shuffle';
 
@@ -258,14 +258,14 @@ export class AnomalyManager {
             apply: () => {
               mom.frozen = true;
               mom.eyes.forEach((e) => e.scale.set(2.2, 2.2, 1.8));
-              (mom.skMat as THREE.MeshLambertMaterial).color.set(0xdfd9ce);
+              setMaterialColor(mom.skMat, 0xdfd9ce);
               if (mom.phone) mom.phone.visible = false;
               modelLoader.applyAnomalyVariant(mom, 'anomaly_faceless');
             },
             revert: () => {
               mom.frozen = false;
               mom.eyes.forEach((e) => e.scale.set(1, 1, 1));
-              (mom.skMat as THREE.MeshLambertMaterial).color.set(mom.skin);
+              setMaterialColor(mom.skMat, mom.skin);
               modelLoader.revertAnomalyVariant(mom);
             },
           };

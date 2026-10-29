@@ -56,7 +56,8 @@ import { routeManager } from './routeManager';
 import { routeText, fillRoute } from './routeText';
 import { resolveEnding, endingSummary, recordEndingToArchive, EndingDefinition, ExitChoice } from './endings';
 import { unlockAchievement } from './achievements';
-import { practice, CHAPTER_START_SEGMENT } from './practice';
+import { setMaterialColor } from '../graphics/modelLoader';
+import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
 
 /** Foggy sodium-vapor night fog colour on the open trestle. */
@@ -131,6 +132,13 @@ export class GameEngine {
   // Multi-Car Consist & Player Movement
   public moveFwd: number = 0;
   public moveRight: number = 0;
+  /**
+   * Walking velocity in input units (1 = full speed), in the view's forward/right frame. With
+   * "Smooth walking" off it equals the input; on, it eases toward it with frame-time-scaled
+   * friction (as in three.js's pointer-lock example: v -= v * 10 * dt), same top speed.
+   */
+  public walkVelFwd: number = 0;
+  public walkVelRight: number = 0;
   public currentCarIndex: number = 1; // 0: Car A (Lead), 1: Car B (Mid), 2: Car C (Rear)
   public isCrossingGangway: boolean = false;
   public nearGangwayDoor: 'front' | 'rear' | null = null;
@@ -264,6 +272,11 @@ export class GameEngine {
   /** This ride is a practice run (started from Chapter II or III): nothing it does is saved. */
   public get isPractice(): boolean {
     return practice.on;
+  }
+
+  /** The spoiler overlay was shown this ride, so nothing from it is saved (see practice.ts). */
+  public get isDebugRun(): boolean {
+    return practice.debugRun;
   }
 
   /** This ride began with "Get back on" after The Eternal Commute. */
@@ -536,6 +549,8 @@ export class GameEngine {
     this.currentCarIndex = 1;
     this.moveFwd = 0;
     this.moveRight = 0;
+    this.walkVelFwd = 0;
+    this.walkVelRight = 0;
     this.isCrossingGangway = false;
     this.nearGangwayDoor = null;
     this.stepTimer = 0;
@@ -646,7 +661,7 @@ export class GameEngine {
       p.pitch = 0.5;
       p.facing = false;
       p.eyes.forEach((e) => e.scale.set(1, 1, 1));
-      (p.skMat as THREE.MeshLambertMaterial).color.set(p.skin);
+      setMaterialColor(p.skMat, p.skin);
     });
 
     [...cb.strangers, cb.extraPerson, ...cb.crowd].forEach((s) => {
@@ -697,6 +712,7 @@ export class GameEngine {
     // Practice run: start at the chapter's first stretch, from the station before it.
     const from = CHAPTER_START_SEGMENT[this.startChapter] ?? 0;
     practice.on = from > 0;
+    practice.debugRun = this.debug || settings.get().debugOverlay;
     practice.chapter = practice.on ? this.startChapter : 1;
     if (from > 0) {
       this.carBuilder.stA.setName(routeManager.getStopName(SEGS[from - 1].stop));
@@ -1466,7 +1482,7 @@ export class GameEngine {
       const mom = this.carBuilder.parents[0];
       mom.frozen = true;
       mom.eyes.forEach((e) => e.scale.set(2.2, 2.2, 1.8));
-      (mom.skMat as THREE.MeshLambertMaterial).color.set(0xdfd9ce);
+      setMaterialColor(mom.skMat, 0xdfd9ce);
       if (mom.phone) mom.phone.visible = false;
     });
     beat(4.0, () => this.setSub('<b>Dad:</b> No. We\u2019re not getting off. You know that.', 3.2));
@@ -1519,7 +1535,7 @@ export class GameEngine {
       const mom = this.carBuilder.parents[0];
       mom.frozen = false;
       mom.eyes.forEach((e) => e.scale.set(1, 1, 1));
-      (mom.skMat as THREE.MeshLambertMaterial).color.set(mom.skin);
+      setMaterialColor(mom.skMat, mom.skin);
     }
     if (!liveId('empty')) {
       this.carBuilder.strangers.forEach((s) => (s.g.visible = true));
@@ -1810,7 +1826,7 @@ export class GameEngine {
 
     // A practice run isn't added to the ride history (or anything else; see practice.ts).
     const runs = this.loadRuns();
-    if (!practice.on) runs.push({
+    if (!offRecord()) runs.push({
       date: Date.now(),
       san: this.san,
       sanPct: this.getSanityScore(),
@@ -1820,7 +1836,7 @@ export class GameEngine {
       endingId: this.resolvedEnding.id,
       nightmare: this.nightmare,
     });
-    if (!practice.on) this.saveRuns(runs);
+    if (!offRecord()) this.saveRuns(runs);
     this.psychLog = recordRide(this.stopLog);
     polaroidManager.develop(); // prints develop now, after scoring
 
@@ -2215,7 +2231,20 @@ export class GameEngine {
 
     // Player movement kinematics (WASD / Arrows) across connected cars & gangways
     if (this.phase === 'ride' || this.phase === 'stop' || this.phase === 'haven' || this.phase === 'intro') {
-      if (this.moveFwd !== 0 || this.moveRight !== 0) {
+      if (settings.get().smoothWalking) {
+        // Friction plus a push toward the input: settles at exactly the input (full speed).
+        const WALK_FRICTION = 10;
+        this.walkVelFwd += (this.moveFwd - this.walkVelFwd) * WALK_FRICTION * dt;
+        this.walkVelRight += (this.moveRight - this.walkVelRight) * WALK_FRICTION * dt;
+        if (this.moveFwd === 0 && Math.abs(this.walkVelFwd) < 0.002) this.walkVelFwd = 0;
+        if (this.moveRight === 0 && Math.abs(this.walkVelRight) < 0.002) this.walkVelRight = 0;
+      } else {
+        this.walkVelFwd = this.moveFwd;
+        this.walkVelRight = this.moveRight;
+      }
+      const vF = this.walkVelFwd;
+      const vR = this.walkVelRight;
+      if (vF !== 0 || vR !== 0) {
         const cosY = Math.cos(this.yaw);
         const sinY = Math.sin(this.yaw);
         const fwdX = -sinY;
@@ -2224,8 +2253,8 @@ export class GameEngine {
         const rgtZ = -sinY;
 
         const moveSpeed = 2.4;
-        let dx = (fwdX * this.moveFwd + rgtX * this.moveRight) * moveSpeed * dt;
-        let dz = (fwdZ * this.moveFwd + rgtZ * this.moveRight) * moveSpeed * dt;
+        let dx = (fwdX * vF + rgtX * vR) * moveSpeed * dt;
+        let dz = (fwdZ * vF + rgtZ * vR) * moveSpeed * dt;
 
         let nextX = this.eyePos.x + dx;
         let nextZ = this.eyePos.z + dz;

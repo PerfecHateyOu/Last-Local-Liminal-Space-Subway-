@@ -3,7 +3,7 @@
  * Persisted in localStorage and displayed in the Case Files dossier.
  */
 
-import { practice } from './practice';
+import { offRecord } from './practice';
 
 export type AchievementId =
   | 'first_anomaly'
@@ -107,7 +107,7 @@ export function loadAchievements(): UnlockedAchievements {
 }
 
 export function unlockAchievement(id: AchievementId): boolean {
-  if (practice.on) return false; // practice runs don't earn badges
+  if (offRecord()) return false; // practice runs don't earn badges
   try {
     const current = loadAchievements();
     if (current[id]) return false; // already unlocked

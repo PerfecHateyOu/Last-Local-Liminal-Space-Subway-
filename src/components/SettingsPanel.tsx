@@ -151,6 +151,20 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose, isTouch }
             <Check label="Invert vertical look" checked={s.invertY} onChange={(v) => settings.set({ invertY: v })} />
             {!isTouch && (
               <Check
+                label="Raw mouse input"
+                hint="Uses your mouse's movement without the system's pointer acceleration, where the browser supports it. Applies the next time the mouse is captured."
+                checked={s.rawMouse}
+                onChange={(v) => settings.set({ rawMouse: v })}
+              />
+            )}
+            <Check
+              label="Smooth walking"
+              hint="Walking speeds up and slows down gradually instead of starting and stopping at once. Same top speed."
+              checked={s.smoothWalking}
+              onChange={(v) => settings.set({ smoothWalking: v })}
+            />
+            {!isTouch && (
+              <Check
                 label="Show control hints"
                 hint="The key strip along the bottom: all through your first ride, then for the first minute of each ride after."
                 checked={s.showHints}
@@ -247,6 +261,15 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose, isTouch }
               />
             </Section>
           )}
+
+          <Section title="Spoilers">
+            <Check
+              label="Debug overlay (spoilers)"
+              hint="Spoiler warning: shows hidden anomalies, sanity and suspicion. It shows during rides while this is on (` hides or shows it on a keyboard). Rides where it's shown are debug runs and save nothing."
+              checked={s.debugOverlay}
+              onChange={(v) => settings.set({ debugOverlay: v })}
+            />
+          </Section>
 
           <Section title="3D Models & Modding">
             <div className="text-xs text-cream leading-relaxed space-y-1">

@@ -8,6 +8,8 @@ import * as THREE from 'three';
 import { GameEngine } from './game/gameState';
 import { audioEngine } from './audio/audioEngine';
 import { settings } from './settings';
+import { practice } from './game/practice';
+import { pointerLock } from './input/pointerLock';
 import { KeyLook, limitYaw } from './input/keyLook';
 import { evp } from './game/evpManager';
 import { passengerBehavior } from './game/passengerBehavior';
@@ -94,8 +96,6 @@ export default function App() {
   const [routeSelectorOpen, setRouteSelectorOpen] = useState(false);
   const routeSelectorOpenRef = useRef(false);
   routeSelectorOpenRef.current = routeSelectorOpen;
-  // Set while the route selector frees the mouse, so losing pointer lock doesn't pause the ride.
-  const quietUnlockRef = useRef(false);
 
   // Held arrow keys; the render loop turns the view while they're down.
   const keyLookRef = useRef(new KeyLook());
@@ -113,6 +113,22 @@ export default function App() {
     evp.setRecording(false);
   }, []);
 
+
+  // Turning "Debug overlay (spoilers)" on mid-ride (pause > Settings) shows it at once and makes
+  // the ride a debug run; turning it off hides it, but the ride stays a debug run.
+  useEffect(() => {
+    let was = settings.get().debugOverlay;
+    return settings.subscribe(() => {
+      const on = settings.get().debugOverlay;
+      if (on === was) return;
+      was = on;
+      const G = engineRef.current;
+      if (!G) return;
+      G.debug = on;
+      if (on && G.phase !== 'menu') practice.debugRun = true;
+      triggerUpdate();
+    });
+  }, []);
 
   useEffect(() => {
     if (phase !== 'menu' && !paused) setSettingsOpen(false);
@@ -170,9 +186,8 @@ export default function App() {
   const requestLock = useCallback(() => {
     if (isTouch) return;
     const canvas = containerRef.current?.querySelector('canvas');
-    if (canvas && !document.pointerLockElement) {
-      canvas.requestPointerLock?.()?.catch?.(() => {});
-    }
+    // Raw mouse input when it's on and supported; failures show "Click to look around".
+    pointerLock.lock(canvas);
   }, [isTouch]);
 
   // Every pause path (Esc, P, tab switch, pause button) goes through here so held inputs
@@ -192,7 +207,8 @@ export default function App() {
       audioEngine.enterPause();
     }
     // Free the cursor so the Resume button can be clicked.
-    if (document.pointerLockElement) document.exitPointerLock();
+    pointerLock.unlock();
+    pointerLock.clearHint();
     if (containerRef.current) containerRef.current.style.transform = '';
     triggerUpdate();
   }, [triggerUpdate, releaseHeldKeys]);
@@ -260,7 +276,7 @@ export default function App() {
     // Test builds only (vite build --mode test): expose internals to the Playwright suite.
     // MODE is replaced at build time, so production bundles don't contain this.
     if (import.meta.env.MODE === 'test') {
-      Object.assign(window, { __G: engine, __A: audioEngine, __S: settings, __R: { renderer, scene, camera, glitchPass }, __shakeCoverScale: shakeCoverScale, __P: polaroidManager, __RT: routeManager, __EVP: evp, __END: { resolveEnding, ENDINGS }, __PB: passengerBehavior, __M: modelLoader });
+      Object.assign(window, { __G: engine, __A: audioEngine, __S: settings, __R: { renderer, scene, camera, glitchPass }, __shakeCoverScale: shakeCoverScale, __P: polaroidManager, __RT: routeManager, __EVP: evp, __END: { resolveEnding, ENDINGS }, __PB: passengerBehavior, __PL: pointerLock, __M: modelLoader });
     }
 
     // Live drag-and-drop support for Blender .glb / .gltf models
@@ -455,7 +471,7 @@ export default function App() {
       // Look speed and vertical direction come from the player's settings.
       const { lookSensitivity: sens, invertY } = settings.get();
       const ySign = invertY ? -1 : 1;
-      if (e.pointerType === 'mouse' && document.pointerLockElement) {
+      if (e.pointerType === 'mouse' && pointerLock.isLocked) {
         G.ty = limitYaw(G.phase, G.ty - e.movementX * 0.0022 * sens);
         G.tp = Math.max(-0.6, Math.min(0.72, G.tp - ySign * e.movementY * 0.0022 * sens));
         return;
@@ -498,15 +514,10 @@ export default function App() {
 
     // Auto-pause when pointerlock is exited mid-game (Esc), but not when the route selector
     // freed the mouse itself (see openRouteSelector).
-    const handleLockChange = () => {
-      if (document.pointerLockElement) return;
-      if (quietUnlockRef.current) {
-        quietUnlockRef.current = false;
-        return;
-      }
+    const offLock = pointerLock.subscribe(({ locked, quiet }) => {
+      if (locked || quiet) return;
       pauseGame();
-    };
-    document.addEventListener('pointerlockchange', handleLockChange);
+    });
     // Leaving full screen mid-ride (Esc, a swipe, the browser's button) pauses, like losing the mouse.
     // The game's own Exit full screen button doesn't: the player chose it and is still playing.
     const offFullscreen = onFullscreenChange(() => {
@@ -519,7 +530,7 @@ export default function App() {
       container.removeEventListener('pointerup', handlePointerEnd);
       container.removeEventListener('pointercancel', handlePointerEnd);
       container.removeEventListener('pointerleave', handlePointerEnd);
-      document.removeEventListener('pointerlockchange', handleLockChange);
+      offLock();
       offFullscreen();
     };
   }, [isTouch, requestLock, pauseGame]);
@@ -528,10 +539,7 @@ export default function App() {
   // mouse is freed to click a line without pausing, and held keys are let go.
   const openRouteSelector = useCallback(() => {
     releaseHeldKeys();
-    if (document.pointerLockElement) {
-      quietUnlockRef.current = true;
-      document.exitPointerLock();
-    }
+    pointerLock.unlock({ quiet: true });
     setRouteSelectorOpen(true);
   }, [releaseHeldKeys]);
 
@@ -566,10 +574,9 @@ export default function App() {
   const albumOpen = polaroidManager.isAlbumOpen;
   const albumFreedLockRef = useRef(false);
   useEffect(() => {
-    if (albumOpen && document.pointerLockElement) {
-      quietUnlockRef.current = true;
+    if (albumOpen && pointerLock.isLocked) {
       albumFreedLockRef.current = true;
-      document.exitPointerLock();
+      pointerLock.unlock({ quiet: true });
     } else if (!albumOpen && albumFreedLockRef.current) {
       albumFreedLockRef.current = false;
       const G = engineRef.current;
@@ -629,10 +636,11 @@ export default function App() {
         return;
       }
 
-      // The spoiler overlay is a development tool: backquote toggles it in `vite dev` only, and
-      // production builds compile it out entirely (HUD.tsx).
-      if (import.meta.env.DEV && e.code === 'Backquote') {
+      // The spoiler overlay: backquote toggles it in `vite dev`, or in any build once the player
+      // turns on Settings > Data > "Debug overlay (spoilers)". Showing it makes this a debug run.
+      if ((import.meta.env.DEV || settings.get().debugOverlay) && e.code === 'Backquote') {
         G.debug = !G.debug;
+        if (G.debug && G.phase !== 'menu') practice.debugRun = true;
         triggerUpdate();
         return;
       }
@@ -838,7 +846,10 @@ export default function App() {
 
     const G = engineRef.current;
     if (G) {
-      G.debug = false; // the backquote key turns it on (development builds)
+      // With Settings > "Debug overlay (spoilers)" on, the overlay shows from the start (phones have no
+      // backquote key) and the whole ride is a debug run. Backquote still hides/shows it on keyboards.
+      G.debug = settings.get().debugOverlay;
+      if (G.debug) practice.debugRun = true;
       G.nightmare = nightmare; // kept for Ride Again / Restart until the next start screen
       G.startChapter = startChapter; // likewise; Chapter II and III are practice runs
       // The first ride starts with the practice stretch (skippable); after that, straight in.
@@ -972,6 +983,16 @@ export default function App() {
             polaroidManager.setAlbum(false);
             triggerUpdate();
           }}
+          onOpenCamera={
+            engineRef.current && engineRef.current.phase !== 'menu' && engineRef.current.phase !== 'end'
+              ? () => {
+                  // Same path as the Camera button (respects busy hands, lowers the recorder).
+                  polaroidManager.setAlbum(false);
+                  if (!polaroidManager.isViewfinderOpen) engineRef.current?.toggleCamera();
+                  triggerUpdate();
+                }
+              : undefined
+          }
         />
       )}
 

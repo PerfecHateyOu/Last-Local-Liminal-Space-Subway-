@@ -9,7 +9,7 @@
  *  - Prints develop after the ride. During the ride the album and the ejected print show an
  *    undeveloped frame with no caption, badge, hint or sanity change.
  */
-import { practice } from './practice';
+import { offRecord } from './practice';
 import * as THREE from 'three';
 import { PolaroidPhoto } from '../types';
 import { audioEngine } from '../audio/audioEngine';
@@ -54,7 +54,7 @@ function thumbnail(dataUrl: string): Promise<string> {
 
 /** Save developed prints as thumbnails, newest first, capped at KEPT_PHOTOS. Private framing data isn't kept. */
 export async function persistThumbnails(photos: PolaroidPhoto[]): Promise<void> {
-  if (!photos.length || practice.on) return; // practice prints stay on this ride's report
+  if (!photos.length || offRecord()) return; // practice prints stay on this ride's report
   try {
     const fresh = await Promise.all(
       photos.map(async (p) => ({ ...p, framed: [], dataUrl: await thumbnail(p.dataUrl) }))

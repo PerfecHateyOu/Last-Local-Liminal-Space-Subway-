@@ -12,15 +12,17 @@ import { TapePlayButton } from './TapePlayButton';
 import { Overlay } from '../ui/Overlay';
 import { StatusChip } from '../ui/StatusChip';
 import { PolaroidPhoto } from '../types';
-import { X, Image as ImageIcon, Sparkles, ZoomIn, Mic } from 'lucide-react';
+import { X, Image as ImageIcon, Sparkles, ZoomIn, Mic, Camera } from 'lucide-react';
 
 interface PolaroidAlbumProps {
   onClose: () => void;
   /** Needed to play tapes; without it the Tapes tab shows transcripts only. */
   engine?: GameEngine;
+  /** Empty album during a ride: a shortcut that closes the log and opens the viewfinder. */
+  onOpenCamera?: () => void;
 }
 
-export const PolaroidAlbum: React.FC<PolaroidAlbumProps> = ({ onClose, engine }) => {
+export const PolaroidAlbum: React.FC<PolaroidAlbumProps> = ({ onClose, engine, onOpenCamera }) => {
   const [selectedPhoto, setSelectedPhoto] = useState<PolaroidPhoto | null>(null);
   const [filter, setFilter] = useState<'all' | 'anomalies' | 'carA' | 'carB' | 'carC'>('all');
   const [tab, setTab] = useState<'prints' | 'tapes'>('prints');
@@ -208,6 +210,17 @@ export const PolaroidAlbum: React.FC<PolaroidAlbumProps> = ({ onClose, engine })
               <p className="text-sm font-medium">{photos.length ? 'No prints from this car.' : 'No Polaroids yet.'}</p>
               {!photos.length && (
                 <p className="text-xs text-dim mt-1">{engine?.isTouch ? 'Tap Camera' : 'Press C'} on the train to take one.</p>
+              )}
+              {!photos.length && onOpenCamera && polaroidManager.remainingFilm > 0 && (
+                <button
+                  type="button"
+                  data-testid="album-open-camera"
+                  onClick={onOpenCamera}
+                  className="mt-4 min-h-11 px-4 py-2 rounded-full bg-warn/15 border border-warn/40 text-warn hover:bg-warn/25 text-xs font-semibold inline-flex items-center gap-2"
+                >
+                  <Camera className="w-4 h-4" aria-hidden="true" />
+                  Open camera
+                </button>
               )}
             </div>
           ) : (

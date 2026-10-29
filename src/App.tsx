@@ -955,6 +955,16 @@ export default function App() {
             polaroidManager.setAlbum(false);
             triggerUpdate();
           }}
+          onOpenCamera={
+            engineRef.current && engineRef.current.phase !== 'menu' && engineRef.current.phase !== 'end'
+              ? () => {
+                  // Same path as the Camera button (respects busy hands, lowers the recorder).
+                  polaroidManager.setAlbum(false);
+                  if (!polaroidManager.isViewfinderOpen) engineRef.current?.toggleCamera();
+                  triggerUpdate();
+                }
+              : undefined
+          }
         />
       )}
 

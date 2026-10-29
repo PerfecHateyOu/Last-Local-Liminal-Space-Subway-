@@ -157,6 +157,14 @@ The exporter lives in `src/dev/glbExport.ts` and is only reached from `dev/expor
 - The trestle sky is a custom shader in the game. It exports as a flat placeholder colour, so repaint it in Blender.
 - Ceiling point lights come in as lights. In the game they are hidden and a small pool of real lights follows the camera, so expect a brighter car in Blender.
 
+## Import Blender models into the game
+
+The game loads custom 3D `.glb` / `.gltf` models for passengers, parents, and uncanny anomaly figures from `public/models/characters/` (configured in `public/models/characters/manifest.json`) via `src/graphics/modelLoader.ts`, with an automatic procedural PS1 fallback if any file is absent:
+
+- **Asset folder:** drop edited or sculpted `.glb` files into `public/models/characters/` (`mom.glb`, `dad.glb`, `passenger_mta.glb`, `passenger_coat.glb`, `passenger_puffer.glb`, `passenger_hoodie_standing.glb`, `passenger_hoodie_seated.glb`, `passenger_texter_seated.glb`, `passenger_texter_standing.glb`, `passenger_overcoat.glb`, `passenger_office_standing.glb`, `passenger_office_seated.glb`, `anomaly_extra.glb`, `anomaly_faceless.glb`, `anomaly_stretched.glb`).
+- **Live drag-and-drop:** while the game is running in the browser, drag any `.glb` or `.gltf` file named after a character (`mom.glb`, `dad.glb`, `mta.glb`, `coat.glb`, `s1.glb`, etc.) onto the window to hot-swap that character live in the subway car.
+- **Node mapping:** the loader maps `Head`, `Pupil_L` / `Pupil_R`, `Phone`, `HabitProp_paper` / `HabitProp_phone`, and `Skin_Mat` into the game's articulated `PersonObject` rig so gaze tracking, train sway, habits, and anomaly triggers keep working. Unrigged Blender meshes are automatically height-normalized, fitted to the head/body pivots, and converted to retro `MeshLambertMaterial` with nearest-neighbor texture filtering.
+
 ## Project layout
 
 | Path | Contents |

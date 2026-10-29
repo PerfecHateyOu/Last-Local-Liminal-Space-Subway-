@@ -214,6 +214,8 @@ export class SubwayCarBuilder {
 
   public registerTarget(root: THREE.Object3D, tid: string, label: string, keep: () => boolean = () => true) {
     const meshes: THREE.Mesh[] = [];
+    root.userData.tid = tid;
+    root.userData.targetMeshes = meshes;
     root.traverse((m) => {
       if ((m as THREE.Mesh).isMesh) {
         m.userData.tid = tid;

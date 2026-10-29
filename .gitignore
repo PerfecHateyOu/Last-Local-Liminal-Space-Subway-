@@ -17,6 +17,3 @@ dist-offline/
 
 # Dev-only .glb exports (bun run export:glb)
 exports/
-
-# Optional Blender models for Mom and Dad (docs/blender-models.md): local only, never shipped
-public/models/characters/*.glb

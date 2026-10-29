@@ -4,9 +4,9 @@
  * unobserved manifestation angle checks, and lifecycle reversion.
  */
 import * as THREE from 'three';
-import { setMaterialColor } from '../graphics/modelLoader';
 import { SWAP_CHAR_MAP } from '../constants';
 import { SubwayCarBuilder, AdObject } from '../graphics/subwayCarBuilder';
+import { modelLoader } from '../graphics/modelLoader';
 import { ActiveAnomaly, AnomalyDef } from '../types';
 import { shuffle } from './shuffle';
 
@@ -234,11 +234,13 @@ export class AnomalyManager {
             desc: 'The woman on your bench twisted her neck beyond anatomical limits to look at you',
             apply: () => {
               s.twist = true;
+              modelLoader.applyAnomalyVariant(s, 'anomaly_stretched');
             },
             revert: () => {
               s.twist = false;
               s.head.rotation.set(s.pose[1], s.pose[0], 0);
               s.head.rotation.z = 0;
+              modelLoader.revertAnomalyVariant(s);
             },
           };
         },
@@ -256,13 +258,15 @@ export class AnomalyManager {
             apply: () => {
               mom.frozen = true;
               mom.eyes.forEach((e) => e.scale.set(2.2, 2.2, 1.8));
-              setMaterialColor(mom.skMat, 0xdfd9ce);
+              (mom.skMat as THREE.MeshLambertMaterial).color.set(0xdfd9ce);
               if (mom.phone) mom.phone.visible = false;
+              modelLoader.applyAnomalyVariant(mom, 'anomaly_faceless');
             },
             revert: () => {
               mom.frozen = false;
               mom.eyes.forEach((e) => e.scale.set(1, 1, 1));
-              setMaterialColor(mom.skMat, mom.skin);
+              (mom.skMat as THREE.MeshLambertMaterial).color.set(mom.skin);
+              modelLoader.revertAnomalyVariant(mom);
             },
           };
         },

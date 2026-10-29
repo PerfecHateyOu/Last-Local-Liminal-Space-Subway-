@@ -18,11 +18,11 @@ import { MoveStick } from './MoveStick';
 import { routeManager } from '../game/routeManager';
 import { polaroidManager } from '../game/polaroidManager';
 import { evp } from '../game/evpManager';
-import { useSettings } from '../settings';
-import { pointerLock } from '../input/pointerLock';
 import { EvpRecorder } from './EvpRecorder';
 import { AnalogRollsign } from './AnalogRollsign';
 import { hintStrip } from '../ui/controls';
+import { useSettings } from '../settings';
+import { modelLoader } from '../graphics/modelLoader';
 
 /** Seconds the key hints stay up on rides after your first. */
 const HINT_SECONDS = 60;
@@ -76,9 +76,7 @@ export const HUD: React.FC<HUDProps> = ({
   }, [hudShown]);
   // Key hints: on for the whole of your first ride (nothing finished on this device yet), and for
   // the first minute of later rides; then they fade. Settings can turn them off.
-  const { showHints, debugOverlay } = useSettings();
-  // A mouse lock request failed (often the browser's cooldown right after Esc): say how to look.
-  const lockHint = React.useSyncExternalStore(pointerLock.subscribeHint, () => pointerLock.hint);
+  const { showHints } = useSettings();
   const rideStartGT = React.useRef(0);
   const firstRide = React.useMemo(() => {
     rideStartGT.current = engine.GT;
@@ -120,7 +118,6 @@ export const HUD: React.FC<HUDProps> = ({
   // Choice options
   const choice = G.choice;
   const showChoices = !!choice;
-
 
   const b = G.getBand(G.bandStop);
 
@@ -351,16 +348,6 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      {lockHint && !G.paused && !pointerLock.isLocked && (
-        <div
-          data-testid="lock-hint"
-          role="status"
-          className="absolute left-1/2 bottom-24 -translate-x-1/2 px-3 py-1 rounded bg-black/60 text-cream/80 text-xs pointer-events-none"
-        >
-          Click to look around
-        </div>
-      )}
-
       {/* Contextual Hint */}
       {G.hintText && G.GT < G.hintUntil && (
         <div className="absolute left-1/2 top-40 sm:top-28 -translate-x-1/2 max-w-[90vw] px-3.5 py-1.5 rounded bg-black/80 border border-white/10 text-cream text-xs sm:text-sm text-center shadow-md transit-sign-flicker-subtle">
@@ -497,9 +484,9 @@ export const HUD: React.FC<HUDProps> = ({
         </div>
       )}
 
-      {/* Spoilers Debug Overlay (dev builds, or Settings > "Debug overlay (spoilers)") */}
-      {(import.meta.env.DEV || debugOverlay) && G.debug && (
-        <div data-testid="debug-overlay" className="absolute left-2 top-14 sm:left-4 sm:top-16 p-2 sm:p-3 rounded bg-black/75 border border-g-line/40 text-g-line font-mono text-3xs sm:text-2xs leading-snug sm:leading-relaxed max-w-[60vw] sm:max-w-sm pointer-events-none select-none z-30">
+      {/* Spoilers Debug Overlay (development builds only; compiled out of production) */}
+      {import.meta.env.DEV && G.debug && (
+        <div className="absolute left-4 top-16 p-3 rounded bg-black/85 border border-g-line/40 text-g-line font-mono text-2xs leading-relaxed max-w-sm pointer-events-auto z-30">
           <div className="font-bold border-b border-white/10 pb-1 mb-1 text-white">
             DEBUG: Stop {G.seg ? `${G.seg.stop}${G.seg.b ? 'b' : ''}` : '1'} ({G.phase}) | TS: {G.ts.toFixed(1)}s
           </div>
@@ -510,6 +497,7 @@ export const HUD: React.FC<HUDProps> = ({
           <div>Gaze: {G.gazeTid || '—'} ({G.dwell.toFixed(1)}s)</div>
           <div>Photos: {polaroidManager.photos.length} prints ({polaroidManager.remainingFilm} film left)</div>
           <div>Active Anomalies: {G.active.filter(a => a.at !== null).length} / {G.active.length}</div>
+          <div>Blender GLB: {modelLoader.getSummary().loaded.length} loaded, {modelLoader.getSummary().fallback.length} fallback</div>
         </div>
       )}
     </div>

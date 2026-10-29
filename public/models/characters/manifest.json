@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "basePath": "/models/characters/",
+  "models": {
+    "mom": {
+      "file": "mom.glb",
+      "role": "parent",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "dad": {
+      "file": "dad.glb",
+      "role": "parent",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "mta": {
+      "file": "passenger_mta.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "coat": {
+      "file": "passenger_coat.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "puffer": {
+      "file": "passenger_puffer.glb",
+      "role": "archetype",
+      "standing": true,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "hoodie_standing": {
+      "file": "passenger_hoodie_standing.glb",
+      "role": "archetype",
+      "standing": true,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "hoodie_seated": {
+      "file": "passenger_hoodie_seated.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "texter_seated": {
+      "file": "passenger_texter_seated.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "texter_standing": {
+      "file": "passenger_texter_standing.glb",
+      "role": "archetype",
+      "standing": true,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "overcoat": {
+      "file": "passenger_overcoat.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "office_standing": {
+      "file": "passenger_office_standing.glb",
+      "role": "archetype",
+      "standing": true,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "office_seated": {
+      "file": "passenger_office_seated.glb",
+      "role": "archetype",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "seat6": {
+      "file": "anomaly_extra.glb",
+      "role": "passenger",
+      "standing": false,
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "anomaly_faceless": {
+      "file": "anomaly_faceless.glb",
+      "role": "anomaly",
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    },
+    "anomaly_stretched": {
+      "file": "anomaly_stretched.glb",
+      "role": "anomaly",
+      "scale": 1.0,
+      "yOffset": 0.0,
+      "rotationY": 0.0,
+      "retroMaterials": true
+    }
+  }
+}

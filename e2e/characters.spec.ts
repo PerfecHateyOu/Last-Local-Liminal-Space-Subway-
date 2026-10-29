@@ -37,3 +37,45 @@ test('breathing is slow and tiny, and off under Reduced screen effects', async (
   expect(Math.max(...moving) - Math.min(...moving)).toBeGreaterThan(0.001);
   expect(scales[scales.length - 1]).toBe(1);
 });
+
+test('Blender GLTF/GLB loader loads character and anomaly models with procedural fallback', async ({ game }) => {
+  const r = await game(`
+    const M = window.__M;
+    await M.loadManifest();
+    await sleep(250);
+    const summary = M.getSummary();
+    const mom = G.carBuilder.parents[0];
+    const s2 = G.carBuilder.strangers[1];
+
+    const mf = G.anomalyMgr.createAnomaly('momface', 0);
+    mf.apply();
+    const momOverlay = mom.head.children.some((c) => /Anomaly_anomaly_faceless/.test(c.name));
+    mf.revert();
+    const momReverted = !mom.head.children.some((c) => /Anomaly_anomaly_faceless/.test(c.name));
+
+    const ft = G.anomalyMgr.createAnomaly('faceturn', 0);
+    ft.apply();
+    const s2Overlay = s2.head.children.some((c) => /Anomaly_anomaly_stretched/.test(c.name));
+    ft.revert();
+    const s2Reverted = !s2.head.children.some((c) => /Anomaly_anomaly_stretched/.test(c.name));
+
+    const badOk = await M.loadCustomGLB('bad_model', new ArrayBuffer(8));
+    return {
+      loadedCount: summary.loaded.length,
+      momOverlay,
+      momReverted,
+      s2Overlay,
+      s2Reverted,
+      badOk,
+      badStatus: M.getStatus('bad_model'),
+    };
+  `);
+  expect(r.loadedCount).toBeGreaterThan(0);
+  expect(r.momOverlay).toBe(true);
+  expect(r.momReverted).toBe(true);
+  expect(r.s2Overlay).toBe(true);
+  expect(r.s2Reverted).toBe(true);
+  expect(r.badOk).toBe(false);
+  expect(r.badStatus).toBe('error');
+});
+

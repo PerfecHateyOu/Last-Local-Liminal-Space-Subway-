@@ -17,8 +17,11 @@ import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pi = process.argv.indexOf('--previews');
+const charsOnly = process.argv.includes('--characters');
 const previewsOnly = pi > 0 ? path.resolve(process.argv[pi + 1]) : null;
-const outDir = previewsOnly ?? path.join(root, 'exports');
+const outDir = charsOnly
+  ? path.join(root, 'public', 'models', 'characters')
+  : previewsOnly ?? path.join(root, 'exports');
 const require = createRequire(path.join(root, 'e2e', 'package.json'));
 const { chromium } = require('@playwright/test');
 
@@ -35,7 +38,7 @@ try {
   await page.waitForFunction(() => window.__exportReady, null, { timeout: 120_000 });
   mkdirSync(outDir, { recursive: true });
   if (!previewsOnly) {
-    const files = await page.evaluate(() => window.__exportGLB());
+    const files = await page.evaluate((cOnly) => (cOnly ? window.__exportCharacterGLBs() : window.__exportGLB()), charsOnly);
     for (const f of files) {
       const buf = Buffer.from(f.b64, 'base64');
       writeFileSync(path.join(outDir, f.name), buf);
@@ -46,6 +49,7 @@ try {
     }
     console.log(`\n${files.length} files written to ${outDir}`);
   }
+  if (!charsOnly) {
   // Previews and contact sheet for every .glb in outDir.
   const prevDir = path.join(outDir, 'previews');
   mkdirSync(prevDir, { recursive: true });
@@ -56,9 +60,10 @@ try {
     writeFileSync(path.join(prevDir, f.replace(/\.glb$/, '.png')), png(d));
     urls.push(d);
   }
-  const sheet = await page.evaluate((u) => window.__contactSheet(u), urls);
-  writeFileSync(path.join(outDir, 'LAST_LOCAL-contact-sheet.png'), png(sheet));
-  console.log(`${urls.length} previews in ${prevDir}, contact sheet LAST_LOCAL-contact-sheet.png`);
+    const sheet = await page.evaluate((u) => window.__contactSheet(u), urls);
+    writeFileSync(path.join(outDir, 'LAST_LOCAL-contact-sheet.png'), png(sheet));
+    console.log(`${urls.length} previews in ${prevDir}, contact sheet LAST_LOCAL-contact-sheet.png`);
+  }
 } finally {
   await browser.close();
   await server.close();

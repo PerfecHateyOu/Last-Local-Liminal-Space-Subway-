@@ -278,4 +278,6 @@ export interface PersonObject {
     prop: THREE.Object3D | null;
     propBase: number;
   };
+  modelSource?: string;
+  isImportedModel?: boolean;
 }

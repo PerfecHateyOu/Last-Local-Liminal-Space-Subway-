@@ -1,3 +1,0 @@
-[test]
-root = "./tests/unit"
-preload = ["./tests/unit/setup.ts"]

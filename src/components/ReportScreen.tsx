@@ -98,10 +98,10 @@ export const ReportScreen: React.FC<ReportScreenProps> = ({ engine, runs, onPlay
             </div>
             <div className="text-right hidden sm:block">
               <span className="font-mono text-2xs font-bold text-paper-dim uppercase tracking-widest block">
-                {G.isPractice || G.isDebugRun ? 'STATUS: NOT FILED' : 'STATUS: FILED'}
+                {G.isPractice ? 'STATUS: NOT FILED' : 'STATUS: FILED'}
               </span>
               <span
-                className={`inline-block w-2.5 h-2.5 rounded-full mt-1 ${G.isPractice || G.isDebugRun ? 'bg-paper-faint' : 'bg-g-line shadow-[0_0_8px_rgba(108,190,69,0.8)]'}`}
+                className={`inline-block w-2.5 h-2.5 rounded-full mt-1 ${G.isPractice ? 'bg-paper-faint' : 'bg-g-line shadow-[0_0_8px_rgba(108,190,69,0.8)]'}`}
               />
             </div>
           </div>
@@ -119,15 +119,10 @@ export const ReportScreen: React.FC<ReportScreenProps> = ({ engine, runs, onPlay
                 come only from full rides.
               </p>
             )}
-            {G.isDebugRun && (
-              <p data-testid="debug-run-note" className="mt-2 text-xs text-paper-dim font-semibold">
-                Debug run: the spoiler overlay was shown, so nothing from this ride is saved.
-              </p>
-            )}
           </div>
 
           {/* One badge row: what kind of ride this was */}
-          {(secret || G.nightmare || G.isPractice || G.isDebugRun) && (
+          {(secret || G.nightmare || G.isPractice) && (
             <div className="-mt-2 mb-4 flex flex-wrap gap-2 relative z-10" data-testid="report-badges">
               {secret && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-g-deep text-paper font-mono text-2xs font-black tracking-wider">
@@ -142,11 +137,6 @@ export const ReportScreen: React.FC<ReportScreenProps> = ({ engine, runs, onPlay
               {G.isPractice && (
                 <span data-testid="practice-tag" className="inline-flex items-center px-2.5 py-1 rounded-sm bg-paper-dim text-cream font-mono text-2xs font-bold tracking-wider">
                   PRACTICE
-                </span>
-              )}
-              {G.isDebugRun && (
-                <span data-testid="debug-run-tag" className="inline-flex items-center px-2.5 py-1 rounded-sm bg-paper-dim text-cream font-mono text-2xs font-bold tracking-wider">
-                  DEBUG RUN
                 </span>
               )}
             </div>

@@ -336,6 +336,60 @@ export async function exportAllBase64() {
   });
 }
 
+/**
+ * Exports the 14 canonical character, parent, and uncanny anomaly `.glb` files
+ * used by `public/models/characters/manifest.json`.
+ */
+export async function exportCharacterManifestModels(): Promise<ExportedFile[]> {
+  const files: ExportedFile[] = [];
+  const emit = async (name: string, root: THREE.Object3D) => {
+    const notes: string[] = [];
+    root.name = name;
+    prepare(root, notes);
+    files.push({ name: `${name}.glb`, bytes: await toGlb(root), notes: [...new Set(notes)] });
+  };
+
+  const scene = new THREE.Scene();
+  const cb = new SubwayCarBuilder(scene);
+  cb.buildScene();
+
+  const characterEntries: Array<[string, PersonObject]> = [
+    ['mom', cb.parents[0]],
+    ['dad', cb.parents[1]],
+    ['passenger_mta', cb.strangers[0]],
+    ['passenger_coat', cb.strangers[1]],
+    ['passenger_puffer', cb.strangers[2]],
+    ['passenger_hoodie_standing', cb.crowd[0]],
+    ['passenger_texter_seated', cb.crowd[1]],
+    ['passenger_overcoat', cb.crowd[2]],
+    ['passenger_office_standing', cb.crowd[3]],
+    ['passenger_office_seated', cb.carAPassengers[0]],
+    ['passenger_texter_standing', cb.carCPassengers[0]],
+    ['passenger_hoodie_seated', cb.carCPassengers[1]],
+    ['anomaly_extra', cb.extraPerson],
+  ];
+
+  for (const [name, p] of characterEntries) {
+    p.head.rotation.set(0, 0, 0);
+    await emit(name, detach(p.g, name, true));
+  }
+
+  await emit('anomaly_faceless', cb.charBuilder.createAnomalyOverlay('anomaly_faceless'));
+  await emit('anomaly_stretched', cb.charBuilder.createAnomalyOverlay('anomaly_stretched'));
+
+  return files;
+}
+
+export async function exportCharacterManifestModelsBase64() {
+  const files = await exportCharacterManifestModels();
+  return files.map((f) => {
+    let s = '';
+    const u = new Uint8Array(f.bytes);
+    for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+    return { name: f.name, notes: f.notes, b64: btoa(s) };
+  });
+}
+
 /** Reload a .glb with GLTFLoader and count what came back (a round-trip sanity check). */
 export async function verifyBase64(b64: string) {
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
@@ -357,3 +411,4 @@ export async function verifyBase64(b64: string) {
   });
   return { meshes, triangles: Math.round(tris), materials: mats.size, textures: gltf.parser.json.textures?.length ?? 0, unnamedNodes: unnamed.length };
 }
+

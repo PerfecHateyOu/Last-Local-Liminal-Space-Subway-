@@ -4,10 +4,10 @@
  * articulated heads for gaze tracking, and specific anomaly state controls.
  */
 import * as THREE from 'three';
-import { takeParentModel, takePassengerModel, PARENT_MODELS } from './modelLoader';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { PersonArchetype, PersonObject } from '../types';
 import { TextureGenerator } from './textureGenerator';
+import { modelLoader } from './modelLoader';
 
 /** A small deterministic RNG seeded from a string (FNV-1a hash into mulberry32). */
 export function seededRandom(key: string): () => number {
@@ -60,7 +60,7 @@ export class CharacterBuilder {
     // Materials. Skin stays its own material per person (an anomaly recolours Mom's); every
     // garment is woven cloth (fabric), shared with anyone wearing the same thing.
     const skMat = new THREE.MeshLambertMaterial({ color: cfg.skin });
-    skMat.name = 'Skin'; // the .glb node contract (modelLoader.ts): exports carry it
+    skMat.name = 'Skin_Mat';
     const clothMat = this.fabric(cfg.shirt);
     const pantsMat = this.fabric(cfg.pants);
     const hairMat = new THREE.MeshLambertMaterial({ color: cfg.hair });
@@ -139,8 +139,8 @@ export class CharacterBuilder {
 
     // Articulated Head
     const head = new THREE.Group();
-    head.rotation.order = 'YXZ';
     head.name = 'Head';
+    head.rotation.order = 'YXZ';
     head.position.set(0, 1.22 + up, 0);
     g.add(head);
 
@@ -190,7 +190,7 @@ export class CharacterBuilder {
       head.add(eyeWhite);
 
       const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.0115, 8, 6), eyePupilMat);
-      pupil.name = ex < 0 ? 'Eye_R' : 'Eye_L';
+      pupil.name = ex < 0 ? 'Pupil_L' : 'Pupil_R';
       pupil.position.set(ex, 0.016, 0.1);
       head.add(pupil);
       eyes.push(pupil);
@@ -218,13 +218,13 @@ export class CharacterBuilder {
     let phone: THREE.Object3D | null = null;
     if (cfg.phone) {
       const phoneGroup = this.makePhone(0x1b1d20);
+      phoneGroup.name = 'Phone';
       phoneGroup.position.set(0, 0.735 + up, 0.3);
       // Tipped the same way as before §5 (screen up and toward the aisle), so from your seat you see
       // the lit screen between the hands. Mom's pale-skin anomaly hides her phone, and that only reads
       // as a tell if the phone is plain to see; turned toward her face it was a dark slab you missed.
       phoneGroup.rotation.x = -0.92;
       g.add(phoneGroup);
-      phoneGroup.name = 'Phone';
       phone = phoneGroup;
     }
 
@@ -239,26 +239,13 @@ export class CharacterBuilder {
     g.position.set(cfg.x, 0, cfg.z);
     g.rotation.y = cfg.ry || 0;
 
-    // Mom and Dad from Blender (.glb), when that's turned on and loaded (modelLoader.ts): the
-    // model replaces the procedural body inside the same root, so position, seat and tid stay.
-    // Other passengers likewise, from a shared file per outfit and pose (each gets its own copy).
-    const model = cfg.tid in PARENT_MODELS ? takeParentModel(cfg.tid) : takePassengerModel(cfg.archetype, cfg.standing);
-    let parts = { head: head as THREE.Group, phone, eyes, skMat: skMat as THREE.Material, skin: cfg.skin };
-    if (model) {
-      g.clear();
-      g.add(model.root);
-      parts = {
-        head: model.head as THREE.Group,
-        phone: model.phone,
-        eyes: model.eyes,
-        skMat: model.skMat,
-        skin: (model.skMat as THREE.MeshLambertMaterial).color.getHex(),
-      };
-    }
-
     const person: PersonObject = {
       g,
-      ...parts,
+      head,
+      phone,
+      eyes,
+      skMat,
+      skin: cfg.skin,
       tid: cfg.tid,
       label: cfg.label,
       home: new THREE.Vector3(cfg.x, 0, cfg.z),
@@ -267,8 +254,46 @@ export class CharacterBuilder {
       standing: !!cfg.standing,
     };
 
-    person.head.rotation.set(person.pose[1], person.pose[0], 0);
+    head.rotation.set(person.pose[1], person.pose[0], 0);
+    modelLoader.bindPerson(person, cfg);
     return person;
+  }
+
+  /**
+   * Builds a standalone uncanny anomaly head/neck overlay mesh for Blender `.glb` export & runtime use.
+   */
+  public createAnomalyOverlay(kind: 'anomaly_faceless' | 'anomaly_stretched'): THREE.Group {
+    const g = new THREE.Group();
+    g.name = kind;
+    const paleSkin = new THREE.MeshLambertMaterial({ color: 0xdfd9ce });
+    paleSkin.name = 'Skin_Mat';
+    const hollowMat = new THREE.MeshBasicMaterial({ color: 0x080709 });
+    hollowMat.name = 'Hollow_Socket_Mat';
+
+    if (kind === 'anomaly_faceless') {
+      [-0.038, 0.038].forEach((ex, idx) => {
+        const socket = new THREE.Mesh(new THREE.RingGeometry(0.018, 0.035, 10), hollowMat);
+        socket.name = idx === 0 ? 'Socket_L' : 'Socket_R';
+        socket.position.set(ex, 0.016, 0.103);
+        g.add(socket);
+      });
+      const blankMask = new THREE.Mesh(new THREE.BoxGeometry(0.068, 0.026, 0.018), paleSkin);
+      blankMask.name = 'Faceless_Seal';
+      blankMask.position.set(0, -0.054, 0.104);
+      g.add(blankMask);
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const seg = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.052 - i * 0.004, 0.058 - i * 0.003, 0.056, 8),
+          paleSkin
+        );
+        seg.name = `Neck_Vertebra_${i + 1}`;
+        seg.position.set(0, -0.11 - i * 0.042, -0.01 * i);
+        seg.rotation.z = (i % 2 === 0 ? 1 : -1) * 0.14;
+        g.add(seg);
+      }
+    }
+    return g;
   }
 
   // ---------------------------------------------------------------------------
@@ -289,7 +314,9 @@ export class CharacterBuilder {
 
   /** Woven cloth in `color`, nudged by this passenger's tint. */
   private fabric(color: number): THREE.MeshLambertMaterial {
-    if (!CharacterBuilder.grain) CharacterBuilder.grain = new TextureGenerator().createClothGrainTexture();
+    if (!CharacterBuilder.grain && typeof document !== 'undefined') {
+      CharacterBuilder.grain = new TextureGenerator().createClothGrainTexture();
+    }
     const c = new THREE.Color(color);
     const hsl = { h: 0, s: 0, l: 0 };
     c.getHSL(hsl);
@@ -382,7 +409,11 @@ export class CharacterBuilder {
         m.removeFromParent();
         m.geometry.dispose();
       }
-      root.add(new THREE.Mesh(merged, mat));
+      const mergedMesh = new THREE.Mesh(merged, mat);
+      if (mat.name === 'Skin_Mat') {
+        mergedMesh.name = root.name === 'Head' ? 'Head_Skin' : 'Body_Skin';
+      }
+      root.add(mergedMesh);
     }
   }
 
@@ -630,6 +661,7 @@ export class CharacterBuilder {
         });
         fold.position.set(0.0, -0.06, 0.07);
         fold.rotation.set(0.15, -0.9, 0);
+        fold.name = 'HabitProp_paper';
         fold.userData.habit = 'paper'; // carLife: turns a page now and then
         hand.add(fold);
       } else {
@@ -642,6 +674,7 @@ export class CharacterBuilder {
         [-0.06, 0.06].forEach((x) => [0.0, -0.035, -0.07].forEach((y) => this.box(read, 0.11, 0.01, 0.014, ink, x, y, 0)));
         read.position.set(0, 0.79, 0.37);
         read.rotation.x = -0.55;
+        read.name = 'HabitProp_paper';
         read.userData.habit = 'paper'; // carLife: turns a page now and then
         g.add(read);
       }
@@ -711,6 +744,7 @@ export class CharacterBuilder {
       phone.add(handset);
       phone.position.set(0, hy + 0.03, hz + 0.01);
       phone.rotation.x = -0.35;
+      phone.name = 'HabitProp_phone';
       phone.userData.habit = 'phone'; // carLife: thumb-scroll flicks
       g.add(phone);
       return;

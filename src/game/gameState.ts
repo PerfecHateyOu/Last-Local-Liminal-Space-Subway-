@@ -5,26 +5,17 @@
  */
 import * as THREE from 'three';
 import {
-  BANDS,
-  BREATH_MAX_FLAGS,
-  BREATH_PER_FLAG_DEG,
-  BREATH_TIERS,
   CALM_CHATS,
   CFG,
   CHATS,
   DRIFT,
-  GLITCH_TIERS,
   HEART_BPM,
-  HEART_JITTER,
-  INTERCOM_EVERY,
   INTERCOM_FIRST,
   INTERCOM_MIN_ROOM,
-  INTERCOM_RETRY,
   MASK_DIALOGUES,
   type MaskDialogue,
   PARANOID_UI_WORDS,
   RESTRAINT_GRACE,
-  RESTRAINT_RAISE,
   SAN,
   SEGS,
   SUS,
@@ -59,11 +50,12 @@ import { unlockAchievement } from './achievements';
 import { setMaterialColor } from '../graphics/modelLoader';
 import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
+import * as engineVitals from './engineVitals';
+import * as engineTools from './engineTools';
+export { SHUTTER_COOLDOWN } from './engineTools';
 
 /** Foggy sodium-vapor night fog colour on the open trestle. */
 const TRESTLE_FOG = new THREE.Color('#322018');
-/** Chance a tape played out loud makes a parent who wasn't watching turn to look. */
-const TAPE_GLANCE_CHANCE = 0.5;
 /** "The next stop is…" PA: seconds into the stretch, and how long it shows. */
 const NEXT_STOP_PA_AT = 7.0;
 const NEXT_STOP_PA_S = 4.5;
@@ -74,10 +66,6 @@ const CHAT_LINE_S = 3.4;
 const MASK_CHECK_S = 10;
 /** The in-transit conductor's garbled lines (audioEngine.conductorBroadcast variants 1–3), subtitled (doc 6). */
 const CONDUCTOR_LINES = ['…stand clear of the closing doors…', '…next stop… transfer available…', '…held momentarily by the dispatcher…'];
-/** Chance a flash makes a parent who wasn't watching turn to look. */
-const FLASH_GLANCE_CHANCE = 0.5;
-/** Game seconds while the print ejects before the next shot (stops a double tap or a held key from burning film). */
-export const SHUTTER_COOLDOWN = 0.9;
 const HAPTIC_DELAY_S = 0.9; // after arrival, between the chime starting and the doors
 import {
   ActiveAnomaly,
@@ -254,7 +242,7 @@ export class GameEngine {
    * watching while it plays costs Suspicion once, and it may make one look.
    */
   public tapePlaying: { signalId: string; inRide: boolean; charged: boolean; endsAt: number } | null = null;
-  private tapeTimer: ReturnType<typeof setTimeout> | null = null;
+  public tapeTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** The trestle badge has been checked this ride. */
   private trestleBadgeChecked = false;
@@ -423,7 +411,7 @@ export class GameEngine {
     this.startIntro();
   }
 
-  private notifyUI() {
+  public notifyUI() {
     if (this.onStateChange) this.onStateChange();
   }
 
@@ -467,52 +455,23 @@ export class GameEngine {
   }
 
   public getBand(stop: number): [number, number] {
-    const base = BANDS[stop] || [0, 9];
-    const b: [number, number] = [base[0], base[1]];
-    if (stop >= 11 && this.restraintOK) {
-      b[1] += RESTRAINT_RAISE;
-    }
-    return b;
+    return engineVitals.getBand(this, stop);
   }
 
   public addSanity(d: number, reason: string) {
-    const [lo, hi] = this.getBand(this.bandStop);
-    const before = this.san;
-    this.san = Math.max(lo, Math.min(hi, this.san + d));
-    this.sanLog.push({ t: this.GT, d: this.san - before, raw: d, reason });
-    this.notifyUI();
+    return engineVitals.addSanity(this, d, reason);
   }
 
   public addSus(n: number, reason: string, watcher?: PersonObject) {
-    this.sus = Math.max(0, Math.min(100, this.sus + n));
-    if (n > 0) {
-      this.peak = Math.max(this.peak, this.sus);
-      this.susLog.push({ t: this.GT, n, reason, stop: this.seg ? this.seg.stop : 1 });
-      this.segSusGain = true;
-    }
-    if (watcher) {
-      watcher.holdUntil = this.GT + 1.6;
-      watcher.until = Math.max(watcher.until || 0, watcher.holdUntil);
-    }
-    this.notifyUI();
+    return engineVitals.addSus(this, n, reason, watcher);
   }
 
   public sampleSanity() {
-    const [lo, hi] = this.getBand(this.bandStop);
-    const pos = hi > lo ? Math.max(0, Math.min(1, (this.san - lo) / (hi - lo))) : 1;
-    this.sanSamples.push({ stop: this.bandStop, san: this.san, lo, hi, pos });
-    const rec = this.stopLog[this.stopLog.length - 1];
-    if (rec && rec.san === undefined) {
-      rec.san = Math.round(this.san);
-      rec.lo = lo;
-      rec.hi = hi;
-    }
+    return engineVitals.sampleSanity(this);
   }
 
   public getSanityScore(): number {
-    if (!this.sanSamples.length) return 0;
-    const avg = this.sanSamples.reduce((a, x) => a + x.pos, 0) / this.sanSamples.length;
-    return Math.round(100 * avg);
+    return engineVitals.getSanityScore(this);
   }
 
   public newGame() {
@@ -1262,78 +1221,21 @@ export class GameEngine {
 
   /** Dad gives you his old microcassette recorder. */
   private giveRecorder(where: 'haven' | 'train') {
-    if (evp.hasRecorder || this.phase === 'end') return;
-    evp.hasRecorder = true;
-    this.say(
-      1,
-      where === 'haven'
-        ? 'Here. Your grandfather\u2019s. He used it on the night shift. Never could get it to stop picking up the radio.'
-        : 'Here, hold onto this. Your grandfather\u2019s old recorder. Never could get it to stop picking up the radio.',
-      4.2
-    );
-    this.setHint(this.isTouch ? 'Dad gave you a tape recorder. Tap Recorder to raise it.' : 'Dad gave you a tape recorder. Press R to raise it.', 5);
-    this.notifyUI();
+    return engineTools.giveRecorder(this, where);
   }
 
   /** Play a saved tape out loud. Playing another one, or the same one again, restarts. */
   public playTape(signalId: string) {
-    const sig = EVP_SIGNALS.find((x) => x.id === signalId);
-    if (!sig || this.paused || this.phase === 'menu') return;
-    this.stopTape();
-    const dur = audioEngine.playTape(sig.voice) || 4; // keep the UI honest even with audio off
-    const inRide = this.phase === 'ride' || this.phase === 'stop';
-    this.tapePlaying = { signalId, inRide, charged: false, endsAt: Date.now() + dur * 1000 };
-    this.tapeTimer = setTimeout(() => {
-      this.tapePlaying = null;
-      this.tapeTimer = null;
-      this.notifyUI();
-    }, dur * 1000);
-    // Heard but not seen: a parent who isn't watching may turn toward the sound.
-    if (inRide && !this.carBuilder.parents.some((p) => p.facing) && Math.random() < TAPE_GLANCE_CHANCE) {
-      this.sched(0.8, () => {
-        if (!this.tapePlaying) return;
-        const free = this.carBuilder.parents.filter((p) => !p.frozen && !p.force);
-        const p = free[Math.floor(Math.random() * free.length)];
-        if (p) {
-          p.mode = 'player';
-          p.holdUntil = this.GT + 2.0;
-          p.until = this.GT + 2.0;
-        }
-      });
-    }
-    this.notifyUI();
+    return engineTools.playTape(this, signalId);
   }
 
   public stopTape() {
-    if (this.tapeTimer) clearTimeout(this.tapeTimer);
-    this.tapeTimer = null;
-    if (this.tapePlaying) {
-      audioEngine.stopTape();
-      this.tapePlaying = null;
-      this.notifyUI();
-    }
+    return engineTools.stopTape(this);
   }
 
   /** Raise or lower the recorder. Raising lowers the camera; it can't come up during prompts. */
   public toggleRecorder(): boolean {
-    if (evp.raised) {
-      evp.lower();
-    } else if (
-      evp.hasRecorder &&
-      !this.choice &&
-      !this.restraint &&
-      (this.phase === 'ride' || this.phase === 'stop' || this.phase === 'haven' || this.phase === 'intro')
-    ) {
-      polaroidManager.setViewfinder(false);
-      this.flagHeld = false;
-      evp.raise();
-    } else if (this.phase === 'ride' || this.phase === 'stop' || this.phase === 'haven' || this.phase === 'intro') {
-      // Say why nothing happened.
-      if (!evp.hasRecorder) this.setHint('You don\u2019t have anything to record with.', 2.5);
-      else if (this.handsBusy) this.setHint(this.handsBusy, 2);
-    }
-    this.notifyUI();
-    return evp.raised;
+    return engineTools.toggleRecorder(this);
   }
 
   /** Mask lines already asked this ride (by text) and the last one asked; reset per ride. */
@@ -1938,18 +1840,7 @@ export class GameEngine {
    * the HUD trace because both come from this clock).
    */
   private updateHeart(dt: number) {
-    const target = HEART_BPM[this.tier];
-    this.heartBpm += (target - this.heartBpm) * (1 - Math.exp(-dt / 2.5));
-    if (this.GT < this.heartNextAt) return;
-
-    // Anchor each beat to its planned time, not the frame it lands on, so the rate doesn't
-    // drift slow at low frame rates. After a long gap (new run), restart the clock.
-    const beatAt = this.GT - this.heartNextAt > 1 ? this.GT : this.heartNextAt;
-    this.heartBeats.push(beatAt);
-    if (this.heartBeats.length > 12) this.heartBeats.shift();
-    const period = (60 / this.heartBpm) * (1 + HEART_JITTER[this.tier] * (Math.random() * 2 - 1));
-    this.heartNextAt = beatAt + period;
-    if (this.tier >= 3) audioEngine.thump(period);
+    return engineVitals.updateHeart(this, dt);
   }
 
   /**
@@ -1958,27 +1849,12 @@ export class GameEngine {
    * Everything eases, so it fades in over a few seconds and settles back out at each station.
    */
   private updateBreath(dt: number) {
-    const p = this.phase === 'ride' ? BREATH_TIERS[this.tier] : null;
-    const flags = Math.min(this.segFlags.length, BREATH_MAX_FLAGS);
-    const depth = p ? p.depthDeg + BREATH_PER_FLAG_DEG * flags : 0;
-    const bpm = p ? p.bpm : this.breathBpm;
-    const tau = depth > this.breathDepth ? 3 : 1.5;
-    this.breathDepth += (depth - this.breathDepth) * (1 - Math.exp(-dt / tau));
-    if (!this.breathBpm) this.breathBpm = bpm || BREATH_TIERS[1]!.bpm;
-    this.breathBpm += (bpm - this.breathBpm) * (1 - Math.exp(-dt / 2.5));
-    // A little slow wander in the rate, so it reads as breathing rather than a metronome.
-    const wander = 1 + 0.12 * Math.sin(this.GT * 0.41) + 0.06 * Math.sin(this.GT * 1.13 + 1.7);
-    this.breathPhase = (this.breathPhase + (dt * this.breathBpm * wander) / 60) % 1;
+    return engineVitals.updateBreath(this, dt);
   }
 
   /** FOV change in degrees (at the 68° base) for this frame: 0 at rest, negative on the inhale. */
   public breathFovOffset(): number {
-    if (this.breathDepth < 0.005) return 0;
-    // Short, quick inhale (35% of the cycle) and a longer exhale.
-    const ph = this.breathPhase;
-    const sm = (x: number) => x * x * (3 - 2 * x);
-    const shape = ph < 0.35 ? sm(ph / 0.35) : 1 - sm((ph - 0.35) / 0.65);
-    return -this.breathDepth * shape;
+    return engineVitals.breathFovOffset(this);
   }
 
   /**
@@ -1987,18 +1863,7 @@ export class GameEngine {
    * intervention) and never starts near braking, so it can't mask the arrival chime or doors.
    */
   private updateIntercom(dt: number, seg: SegmentDef) {
-    this.intercomT -= dt;
-    if (this.intercomT > 0) return;
-    const roomBeforeBraking = this.segLen(seg) - TD - this.ts;
-    const busy = !!this.paText || !!this.subHtml || !!this.choice || !!this.restraint || this.intervening;
-    if (busy || roomBeforeBraking < INTERCOM_MIN_ROOM) {
-      this.intercomT = INTERCOM_RETRY;
-      return;
-    }
-    const duration = audioEngine.intercom(this.tier);
-    this.intercomUntil = this.GT + duration;
-    this.intercomCount++;
-    this.intercomT = duration + INTERCOM_EVERY[0] + Math.random() * (INTERCOM_EVERY[1] - INTERCOM_EVERY[0]);
+    return engineVitals.updateIntercom(this, dt, seg);
   }
 
   /**
@@ -2007,26 +1872,12 @@ export class GameEngine {
    * Critical anomaly appearing above Low still uses the Low ranges.
    */
   public triggerGlitch(reason: 'anomaly' | 'decoy') {
-    const p = GLITCH_TIERS[this.tier] ?? (reason === 'anomaly' ? GLITCH_TIERS[2] : null);
-    if (!p) return;
-    // One at a time: never restart a glitch that's still playing (e.g. two anomalies in one frame).
-    if (this.glitch && this.GT - this.glitch.start < this.glitch.duration) return;
-    const r = (range: [number, number]) => range[0] + Math.random() * (range[1] - range[0]);
-    const strength = r(p.strength);
-    const duration = r(p.duration);
-    this.glitch = { start: this.GT, duration, strength, seed: Math.random() * 1000 };
-    this.glitchLog.push({ gt: this.GT, reason, strength, duration });
-    if (this.glitchLog.length > 50) this.glitchLog.shift();
+    return engineVitals.triggerGlitch(this, reason);
   }
 
   /** Current glitch strength 0..1: fast attack, eased decay. 0 when idle or paused. */
   public glitchAmount(): number {
-    const g = this.glitch;
-    if (!g || this.paused) return 0;
-    const p = (this.GT - g.start) / g.duration;
-    if (p < 0 || p >= 1) return 0;
-    const env = p < 0.08 ? p / 0.08 : Math.pow(1 - (p - 0.08) / 0.92, 1.5);
-    return g.strength * env;
+    return engineVitals.glitchAmount(this);
   }
 
   /**
@@ -2040,13 +1891,7 @@ export class GameEngine {
 
   /** Decoy glitches at Low and Critical, at random during rides. */
   private updateGlitchDecoys(dt: number) {
-    if (this.glitch && this.GT - this.glitch.start >= this.glitch.duration) this.glitch = null;
-    const p = GLITCH_TIERS[this.tier];
-    if (!p) return;
-    this.glitchDecoyT -= dt;
-    if (this.glitchDecoyT > 0) return;
-    if (!this.glitch) this.triggerGlitch('decoy');
-    this.glitchDecoyT = p.decoyEvery[0] + Math.random() * (p.decoyEvery[1] - p.decoyEvery[0]);
+    return engineVitals.updateGlitchDecoys(this, dt);
   }
 
   private updateChoiceTimer(dt: number) {
@@ -2837,19 +2682,7 @@ export class GameEngine {
   }
 
   public interactGangwayDoor(): boolean {
-    if (this.nearGangwayDoor === 'front' || this.gazeTid === 'gangway:front') {
-      this.carBuilder.toggleFrontDoor();
-      audioEngine.doorGangway();
-      this.notifyUI();
-      return true;
-    }
-    if (this.nearGangwayDoor === 'rear' || this.gazeTid === 'gangway:rear') {
-      this.carBuilder.toggleRearDoor();
-      audioEngine.doorGangway();
-      this.notifyUI();
-      return true;
-    }
-    return false;
+    return engineTools.interactGangwayDoor(this);
   }
 
   /**
@@ -2876,52 +2709,10 @@ export class GameEngine {
 
   /** Raise or lower the camera (C, or the HUD button). Not while an answer or the restraint needs you. */
   public toggleCamera(): boolean {
-    if (!polaroidManager.isViewfinderOpen && this.handsBusy) {
-      this.setHint(this.handsBusy, 2);
-      return false;
-    }
-    evp.lower(); // hands busy: raising the camera lowers the recorder
-    return polaroidManager.toggleViewfinder();
+    return engineTools.toggleCamera(this);
   }
 
   public takePolaroidPhoto() {
-    if (!this.shutterReady) return null;
-    if (polaroidManager.remainingFilm <= 0) {
-      this.setHint('Out of film.', 2.5);
-    }
-    const seg = this.seg;
-    const photo = polaroidManager.snapPhoto(
-      this.scene,
-      this.camera,
-      this.renderer,
-      this.active,
-      this.currentCarIndex,
-      routeManager.routeId,
-      this.GT,
-      seg && this.phase === 'ride' ? this.segIdx : -1,
-      seg ? `${seg.stop}${seg.b ? 'b' : ''}` : ''
-    );
-    if (!photo) return null;
-    this.nextShotAt = this.GT + SHUTTER_COOLDOWN;
-
-    passengerBehavior.handleCameraFlash(this.carBuilder.getAllPassengers(), this.camera.position, this.GT);
-
-    if (this.phase === 'ride' || this.phase === 'stop') {
-      const watcher = this.carBuilder.parents.find((p) => p.facing);
-      if (watcher) {
-        this.addSus(SUS.visible, `Took a flash photo while ${watcher.label} was watching`, watcher);
-      } else if (Math.random() < FLASH_GLANCE_CHANCE) {
-        // The flash catches a parent's eye: they turn to look (no Suspicion by itself).
-        const free = this.carBuilder.parents.filter((p) => !p.frozen && !p.force);
-        const p = free[Math.floor(Math.random() * free.length)];
-        if (p) {
-          p.mode = 'player';
-          p.holdUntil = this.GT + 1.8;
-          p.until = this.GT + 1.8;
-        }
-      }
-    }
-    this.notifyUI();
-    return photo;
+    return engineTools.takePolaroidPhoto(this);
   }
 }

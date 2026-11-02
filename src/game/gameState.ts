@@ -52,6 +52,7 @@ import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
 import * as engineVitals from './engineVitals';
 import * as engineTools from './engineTools';
+import * as engineTrial from './engineTrial';
 export { SHUTTER_COOLDOWN } from './engineTools';
 
 /** Foggy sodium-vapor night fog colour on the open trestle. */
@@ -297,7 +298,8 @@ export class GameEngine {
   private tmpVec1 = new THREE.Vector3();
   private tmpVec2 = new THREE.Vector3();
   public eyePos = new THREE.Vector3(0, 1.18, 0.4);
-  private trialEyePos = new THREE.Vector3(0, 1.6, 2.2);
+  // Public so engineTrial can place the camera during a trial (visibility only; no behavior change).
+  public trialEyePos = new THREE.Vector3(0, 1.6, 2.2);
   private idleTime: number = 0;
 
   // Event callbacks for UI
@@ -1191,7 +1193,8 @@ export class GameEngine {
     }
   }
 
-  private departNext() {
+  // Public so engineTrial's exit can hand back to the ride (visibility only; no behavior change).
+  public departNext() {
     if (this.phase === 'end') return;
     this.setPA('Stand clear of the closing doors, please.', 3.0);
     audioEngine.chime();
@@ -1456,221 +1459,28 @@ export class GameEngine {
 
   // False Stop Trial
   public startTrial() {
-    evp.lower();
-    this.phase = 'trial';
-    this.trial = {
-      depth: 0,
-      need: 2,
-      mode: 'paths',
-      cyc: 0,
-      correct: 0,
-      events: [],
-      picks: [],
-      stopName: routeManager.getStopName(this.seg!.stop),
-      stepT: 2,
-    };
-
-    this.carBuilder.worldGroup.visible = false;
-    this.trialBuilder.group.visible = true;
-    this.ty = 0;
-    this.tp = 0;
-    this.yaw = 0;
-    this.pitch = 0;
-
-    audioEngine.setBedLevel(0.05, 0.5);
-    this.newTrialRound();
-    this.setHint('Find the way back. The signs lie. Watch the lights when the chime plays.', 6.0);
-    this.notifyUI();
+    return engineTrial.startTrial(this);
   }
 
   private newTrialRound() {
-    const tr = this.trial!;
-    const d = tr.depth;
-    tr.correct = tr.mode === 'paths' ? Math.floor(Math.random() * 3) : Math.random() < 0.5 ? 0 : 2;
-
-    const rt = routeText();
-    const toward = fillRoute('To {terminusSign} trains', rt);
-    const signsPool = [
-      [toward, 'Exit', fillRoute('To {opposite} trains', rt)],
-      [toward, toward, toward],
-      // The signs start to fail: the first word's letters swap, and one points at you.
-      [toward.replace(/^To (\S)(\S)/, 'To $2$1').replace(/trains$/, 'trians'), 'Ext', 'To You'],
-      [rt.origin, rt.origin, rt.origin],
-    ];
-    const signs = shuffle(signsPool[Math.min(d, 3)]);
-
-    this.trialBuilder.open.forEach((o, i) => {
-      const isDoor = tr.mode === 'board' && i !== 1;
-      this.trialBuilder.setSignText(o, tr.mode === 'board' ? (i === 1 ? '—' : fillRoute('{terminusSign}-bound {line}', rt)) : signs[i]);
-      o.interior.visible = isDoor;
-      o.leaves.forEach((l) => {
-        l.lg.visible = isDoor;
-        l.lg.position.x = l.x0;
-      });
-      o.openAmt = 0;
-      o.target = 0;
-      o.flickUntil = -1;
-    });
-
-    this.trialBuilder.tileMat.color.setHSL(0.12 - d * 0.03, 0.25 + d * 0.12, 0.9 - d * 0.12);
-    tr.cyc = 3.2;
-
-    const pathLabels = [
-      ['Left stairs', 'Turnstiles', 'Right stairs'],
-      ['Left stairs', 'Middle stairs', 'Right stairs'],
-      ['Down', 'Down', 'Down'],
-    ];
-    const labels = tr.mode === 'paths' ? pathLabels[Math.min(d, 2)] : ['Board the left train', 'Board the right train'];
-    const items: ChoiceItem[] =
-      tr.mode === 'paths'
-        ? labels.map((t, i) => ({ txt: t, val: i }))
-        : [{ txt: labels[0], val: 0 }, { txt: labels[1], val: 2 }];
-
-    const win = d === 0 ? Infinity : Math.max(7, 14 - d * 2);
-    this.presentChoice({
-      items,
-      window: win,
-      glitch: d * 0.18,
-      onPick: (val) => this.onTrialPick(val),
-    });
+    return engineTrial.newTrialRound(this);
   }
 
   private trialCycle() {
-    const tr = this.trial!;
-    audioEngine.chime();
-    tr.events = [];
-    if (tr.mode === 'paths') {
-      tr.events.push({ at: 0, i: tr.correct, kind: 'flick' });
-      [0, 1, 2]
-        .filter((i) => i !== tr.correct)
-        .forEach((i) => tr.events.push({ at: 0.8 + Math.random() * 2.2, i, kind: 'flick' }));
-      if (tr.depth >= 1) {
-        const decoy = [0, 1, 2].filter((i) => i !== tr.correct)[Math.floor(Math.random() * 2)];
-        tr.events.push({ at: 0.22 + Math.random() * 0.13, i: decoy, kind: 'flick' });
-      }
-    } else {
-      const fake = tr.correct === 0 ? 2 : 0;
-      tr.events.push(
-        { at: 1.95, i: tr.correct, kind: 'open' },
-        { at: 1.15, i: fake, kind: 'open' },
-        { at: 3.2, i: 0, kind: 'close' },
-        { at: 3.2, i: 2, kind: 'close' }
-      );
-    }
+    return engineTrial.trialCycle(this);
   }
 
   private updateTrial(dt: number) {
-    const tr = this.trial;
-    if (!tr || !this.trialBuilder.group.visible) return;
-
-    tr.cyc += dt;
-    if (tr.cyc >= 3.6) {
-      tr.cyc -= 3.6;
-      this.trialCycle();
-    }
-
-    tr.events.forEach((e) => {
-      if (!e.done && tr.cyc >= e.at) {
-        e.done = true;
-        const o = this.trialBuilder.open[e.i];
-        if (e.kind === 'flick') o.flickUntil = this.GT + 0.14;
-        else if (e.kind === 'open') o.target = 1;
-        else o.target = 0;
-      }
-    });
-
-    this.trialBuilder.open.forEach((o) => {
-      const off = this.GT < o.flickUntil;
-      o.lmat.color.set(off ? 0x111111 : 0xfff2d6);
-      o.pl.intensity = off ? 0 : 0.9;
-      o.openAmt += (o.target - o.openAmt) * (1 - Math.exp(-9 * dt));
-      o.leaves.forEach((l) => (l.lg.position.x = l.x0 + l.s * 0.75 * o.openAmt));
-    });
-
-    tr.stepT -= dt;
-    if (tr.depth >= 1 && tr.stepT <= 0) {
-      tr.stepT = (1.2 + Math.random() * 2.3) / tr.depth;
-      audioEngine.step();
-    }
-
-    this.camera.position.copy(this.trialEyePos);
-    if (this.camera.aspect < 1) this.camera.position.z = 3.3;
-    this.camera.rotation.z = Math.sin(this.GT * 0.7) * 0.012 * tr.depth;
+    return engineTrial.updateTrial(this, dt);
   }
 
   private onTrialPick(val: any) {
-    const tr = this.trial!;
-    const ok = val === tr.correct;
-    tr.picks.push({ mode: tr.mode, ok });
-
-    this.sched(0.7, () => {
-      if (tr.mode === 'paths') {
-        if (ok) {
-          tr.need--;
-          this.setSub(
-            tr.need > 0 ? '<em>The stairs go down to another platform.</em>' : '<em>You come out at the platform edge. Two trains are coming.</em>',
-            3.0
-          );
-          if (tr.need <= 0) tr.mode = 'board';
-        } else {
-          tr.depth++;
-          tr.need = Math.min(tr.need + 1, 3);
-          this.setSub('<em>The stairs bring you back up onto the same platform. It\u2019s quieter now.</em>', 3.2);
-        }
-      } else {
-        if (ok) {
-          this.exitTrial(true);
-          return;
-        }
-        tr.depth++;
-        tr.mode = 'paths';
-        tr.need = 1;
-        this.setSub('<em>The doors close on nothing. You\u2019re back on the stairs.</em>', 3.2);
-      }
-
-      if (tr.depth >= 4) {
-        this.exitTrial(false);
-        return;
-      }
-      this.newTrialRound();
-    });
+    return engineTrial.onTrialPick(this, val);
   }
 
   private exitTrial(clean: boolean) {
-    const tr = this.trial!;
-    this.trials.push({ stop: this.seg!.stop, depth: tr.depth, clean });
-
-    this.sched(0.2, () => {
-      this.trialBuilder.group.visible = false;
-      this.carBuilder.worldGroup.visible = true;
-      this.ty = 0;
-      this.tp = -0.05;
-      this.yaw = 0;
-      this.pitch = -0.05;
-      this.prevDir = null;
-      this.angVel = 0;
-      this.snapArc = 0;
-      this.snapPeak = 0;
-      this.snapCd = 1.5;
-
-      this.addSus(SUS.falsePos, `Walked off the train at ${routeManager.getStopName(this.seg!.stop)}`, this.carBuilder.parents[0]);
-      this.phase = 'stop';
-      this.trial = null;
-      this.addSanity(SAN.trial, 'Returned from a False Stop Trial');
-      this.harder = 3;
-
-      audioEngine.setBedLevel(1.0, 1.0);
-      this.setSub(
-        clean
-          ? '<b>Mom:</b> Where did you go?! You can\u2019t just walk off like that!'
-          : '<em>You don\u2019t remember getting back on.</em> <b>Mom:</b> Oh my god. Where were you?',
-        3.4
-      );
-      this.sched(3.6, () => this.say(1, 'Sit. Stay where we can see you.', 2.6));
-      this.sched(6.4, () => this.departNext());
-    });
+    return engineTrial.exitTrial(this, clean);
   }
-
   public presentChoice(options: {
     items: ChoiceItem[];
     window: number;

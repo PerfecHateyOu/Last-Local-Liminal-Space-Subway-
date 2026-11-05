@@ -48,6 +48,7 @@ import { routeText, fillRoute } from './routeText';
 import { resolveEnding, endingSummary, recordEndingToArchive, EndingDefinition, ExitChoice } from './endings';
 import { unlockAchievement } from './achievements';
 import { setMaterialColor } from '../graphics/modelLoader';
+import { pushOutOfCircles, PERSON_KEEP_OUT, type KeepOutCircle } from './personKeepOut';
 import { practice, offRecord, CHAPTER_START_SEGMENT } from './practice';
 import { Tutorial, markTutorialSeen } from './tutorial';
 import * as engineVitals from './engineVitals';
@@ -305,6 +306,22 @@ export class GameEngine {
   // Event callbacks for UI
   public onStateChange?: () => void;
   public onReportReady?: (runs: RunHistoryRecord[]) => void;
+
+  private keepOutPos = new THREE.Vector3();
+  /** Floor circles around every standing passenger currently shown (crowds come and go). */
+  private standingKeepOut(): KeepOutCircle[] {
+    const cb = this.carBuilder;
+    const out: KeepOutCircle[] = [];
+    for (const p of [...cb.strangers, ...cb.crowd, ...cb.carAPassengers, ...cb.carCPassengers]) {
+      if (!p.standing) continue;
+      let shown = true;
+      for (let o: THREE.Object3D | null = p.g; o; o = o.parent) if (!o.visible) { shown = false; break; }
+      if (!shown) continue;
+      p.g.getWorldPosition(this.keepOutPos);
+      out.push({ x: this.keepOutPos.x, z: this.keepOutPos.z, r: PERSON_KEEP_OUT });
+    }
+    return out;
+  }
 
   constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, renderer: THREE.WebGLRenderer, isTouch: boolean = false) {
     this.scene = scene;
@@ -1936,6 +1953,11 @@ export class GameEngine {
 
         // Train consist length limits
         nextX = Math.max(-27.0, Math.min(27.0, nextX));
+
+        // Standing passengers: don't walk into them (see game/personKeepOut.ts)
+        const kept = pushOutOfCircles(nextX, nextZ, this.standingKeepOut(), this.eyePos.x, this.eyePos.z);
+        nextX = kept.x;
+        nextZ = Math.max(-maxZ, Math.min(maxZ, kept.z));
 
         this.eyePos.x = nextX;
         this.eyePos.z = nextZ;
